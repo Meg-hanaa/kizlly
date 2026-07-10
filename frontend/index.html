@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kizlly — Graph-powered contract intelligence platform. Upload, review, and manage contracts with AI-driven risk analysis and Neo4j graph insights.">
+    <meta name="theme-color" content="#0f172a">
+    <title>Kizlly — Contract Intelligence Platform</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+    <!-- D3.js v7 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- NAVIGATION BAR                                         -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <nav class="navbar" id="navbar">
+        <div class="navbar-inner">
+            <a href="#/home" class="navbar-logo" aria-label="Kizlly Home" style="display: flex; align-items: center; gap: 8px; text-decoration: none;">
+                <img src="assets/kizlly_logo.png?v=3" alt="Kizlly" style="height: 28px; width: 28px; border-radius: 50%; object-fit: cover;">
+                <span class="logo-text">Kizlly</span>
+            </a>
+
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="navbar-links" id="navbarLinks">
+                <a href="#/home" class="nav-link" data-route="home">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Home
+                </a>
+                <a href="#/upload" class="nav-link" data-route="upload">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload
+                </a>
+                <a href="#/portfolio" class="nav-link" data-route="portfolio">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                    Portfolio
+                </a>
+                <a href="#/graph" class="nav-link" data-route="graph">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    Graph
+                </a>
+                <a href="#/audit" class="nav-link" data-route="audit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Audit Trail
+                </a>
+            </div>
+
+            <!-- Right-aligned Actions (Language Switcher + User Profile) -->
+            <div class="navbar-actions-right" style="display: flex; align-items: center; gap: 12px; margin-left: auto;">
+                <button id="lang-switch-global-btn" class="btn btn-outline btn-sm">Hindi</button>
+                
+                <div class="navbar-user" id="navbarUser">
+                    <!-- Populated by auth.js -->
+                    <button class="btn btn-outline btn-sm" id="loginBtn" onclick="AuthManager.showLoginModal()">
+                        Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT AREA                                      -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <main class="main-content" id="app">
+        <!-- Views are dynamically rendered here by the router -->
+        <div class="view-loading">
+            <div class="spinner"></div>
+            <p>Loading…</p>
+        </div>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- TOAST NOTIFICATION CONTAINER                           -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- LOGIN / REGISTER MODAL                                 -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="authModal" aria-hidden="true">
+        <div class="modal">
+            <button class="modal-close" onclick="AuthManager.hideLoginModal()" aria-label="Close">&times;</button>
+
+            <div class="modal-header">
+                <h2 id="authModalTitle">Sign in to Kizlly</h2>
+                <p class="text-muted">Contract Intelligence Platform</p>
+            </div>
+
+            <div class="modal-body">
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form" onsubmit="return AuthManager.handleLoginSubmit(event)">
+                    <div class="form-group">
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" class="form-input" placeholder="Enter your username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+                    </div>
+                    <div class="form-error" id="loginError"></div>
+                    <button type="submit" class="btn btn-primary btn-full" id="loginSubmitBtn">
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Register Form (hidden by default) -->
+                <form id="registerForm" class="auth-form" style="display:none" onsubmit="return AuthManager.handleRegisterSubmit(event)">
+                    <div class="form-group">
+                        <label for="regDisplayName">Display Name</label>
+                        <input type="text" id="regDisplayName" class="form-input" placeholder="Your full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="regUsername">Username</label>
+                        <input type="text" id="regUsername" class="form-input" placeholder="Choose a username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">Password</label>
+                        <input type="password" id="regPassword" class="form-input" placeholder="Create a password" required autocomplete="new-password">
+                    </div>
+                    <div class="form-error" id="registerError"></div>
+                    <button type="submit" class="btn btn-primary btn-full" id="registerSubmitBtn">
+                        Create Account
+                    </button>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <p id="authToggleText">
+                    Don't have an account?
+                    <a href="#" onclick="AuthManager.toggleAuthForm(event)" id="authToggleLink">Create one</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FOOTER                                                 -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <footer class="app-footer" id="appFooter" style="background: #131118; border-top: 1px solid rgba(243, 241, 245, 0.08); padding: 60px 0 30px 0; margin-top: 100px;">
+        <div class="footer-inner" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
+            <div class="grid-4" style="gap: 40px; margin-bottom: 50px;">
+                <div>
+                    <div class="flex items-center gap-2" style="margin-bottom: 16px;">
+                        <img src="assets/kizlly_logo.png" alt="Kizlly" style="height: 32px; width: 32px; border-radius: 50%; object-fit: cover;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: #FFF; font-family: 'Inter', sans-serif;">Kizlly</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; line-height: 1.6; margin: 0;">Semantic contract mapping and exposure tracking for high-velocity teams.</p>
+                </div>
+                <div>
+                    <h5 style="color: #FFF; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 16px 0;">Product</h5>
+                    <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                        <li><a href="#/upload" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; transition: color 0.2s;">Workspace</a></li>
+                        <li><a href="#/portfolio" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; transition: color 0.2s;">Active Risks</a></li>
+                        <li><a href="#/graph" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; transition: color 0.2s;">Graph Visualizer</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 style="color: #FFF; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 16px 0;">Platform</h5>
+                    <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                        <li><a href="#/audit" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; transition: color 0.2s;">Audit Ledger</a></li>
+                        <li><a href="#/home" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; transition: color 0.2s;">Capabilities</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 style="color: #FFF; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 16px 0;">Legal Notice</h5>
+                    <p style="color: var(--text-muted); font-size: 0.75rem; line-height: 1.5; margin: 0;">Kizlly is a decision support tool, not legal counsel. All risk extractions are suggestions for review.</p>
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid rgba(243, 241, 245, 0.05); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">© 2026 Kizlly. All rights reserved.</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SCRIPTS (load order matters)                           -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/home.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/audit.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
