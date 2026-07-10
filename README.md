@@ -6,6 +6,18 @@ Kizlly is a local-first, privacy-respecting contract audit platform. It allows l
 
 ---
 
+## About the Project
+
+Kizlly is built to bridge the gap between AI capability and corporate data security. Typical legal AI systems require uploading complete, highly confidential agreements to cloud servers, risking exposure of trade secrets and compliance violations. 
+
+Kizlly solves this by processing contracts through an isolated, multi-stage hybrid RAG pipeline:
+- **Local Embedding & Chunker**: Documents are ingested locally. Text is split semantically and encoded into vector embeddings directly on the host machine using localized models, keeping the bulk of the raw contract confidential.
+- **Anonymized API Audit**: Only small, isolated clause chunks containing suspected risks are sent to LLMs for classification, rate-limited and tracked inside a transparency ledger.
+- **Durable Orchestration Engine**: Every step of the review process is managed by a durable workflow controller. If network connections drop or LLM limits are hit, progress is saved, allowing reviewers to resume from the exact checkpoint.
+- **Relational Graph Modeling**: Approved compliance data is automatically synchronized to a Neo4j graph database, converting static legal text into a live dashboard showing active vendor risks, renewals, and liability concentrations.
+
+---
+
 ## Problem & Domain
 
 Describe the problem you are solving.
@@ -120,7 +132,7 @@ Highlight the most important features of your project:
 - Python 3.10+
 - A modern web browser
 - A Groq API Key (for LLM contract parsing)
-- A Neo4j AuraDB instance (Optional, for graph visualizer)
+- A Neo4j AuraDB instance
 
 ### Local Setup:
 
