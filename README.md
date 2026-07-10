@@ -165,11 +165,11 @@ Highlight the most important features of your project:
 
 ## Future Scope
 
-List improvements, extensions, or follow-up features:
-
-- More integrations  
-- Security enhancements  
-- Localization / broader accessibility  
+- **Fully Offline Local Execution (100% Privacy)**: Transition RAG and LLM tasks from cloud APIs to local deployment models (such as Llama-3-Legal-7B or Mistral-7B) using Ollama or vLLM to run completely offline on corporate servers.
+- **Cross-Contract Precedent Matching**: Expand the FAISS vector database to match new incoming agreements against a library of approved historical corporate templates, flagging clauses that deviate from pre-approved guidelines.
+- **Dynamic ER Graph Extraction**: Utilize LLM-driven entity-relation extraction to discover new node and edge categories (such as jurisdiction zones, liability limits, and indemnity conditions) and dynamically append them to the Neo4j schema.
+- **Cryptographic Audit Integrity**: Append digital signatures and hashes to the SQLite audit logs to make the compliance audit ledger tamper-proof and verifiable by external regulators.
+- **Autonomous Action Workflows**: Integrate webhooks to automatically trigger notifications or sync renewal tasks directly into CRM/ERP platforms (such as Salesforce, SAP, or Slack) when deadlines approach.
 
 ---
 
