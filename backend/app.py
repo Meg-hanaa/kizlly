@@ -15,7 +15,11 @@ import uuid
 import shutil
 import asyncio
 import traceback
+<<<<<<< HEAD
 from datetime import datetime
+=======
+from datetime import datetime, timezone, timedelta
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -124,6 +128,188 @@ def get_workflow_engine():
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
+# Renewal watch background worker and date helpers
+# ---------------------------------------------------------------------------
+
+def parse_date(date_str: str) -> Optional[datetime]:
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(date_str.strip(), fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def get_time_remaining_label(diff_seconds: float) -> str:
+    if diff_seconds < 0:
+        return "Expired"
+    if diff_seconds < 60:
+        return f"{int(diff_seconds)}s remaining"
+    if diff_seconds < 3600:
+        return f"{int(diff_seconds // 60)}m remaining"
+    if diff_seconds < 86400:
+        return f"{int(diff_seconds // 3600)}h remaining"
+    return f"{int(diff_seconds // 86400)}d remaining"
+
+
+def calculate_trigger_dates(renewal_dt: datetime) -> dict[str, datetime]:
+    now = datetime.now(timezone.utc)
+    diff = renewal_dt - now
+    # Scale triggers for demo context if date is set to near-future
+    if diff.total_seconds() < 86400:
+        return {
+            "90_day": renewal_dt - timedelta(seconds=90),
+            "60_day": renewal_dt - timedelta(seconds=60),
+            "30_day": renewal_dt - timedelta(seconds=30)
+        }
+    else:
+        return {
+            "90_day": renewal_dt - timedelta(days=90),
+            "60_day": renewal_dt - timedelta(days=60),
+            "30_day": renewal_dt - timedelta(days=30)
+        }
+
+
+def get_contract_details(contract_id: str, neo4j_client=None) -> dict:
+    from typing import Any
+    if neo4j_client and neo4j_client.is_connected:
+        try:
+            query = """
+            MATCH (c:Contract {id: $contract_id})
+            MATCH (c)-[:WITH_VENDOR]->(v:Vendor)
+            RETURN c.title AS title, v.name AS vendor_name, c.renewal_date AS renewal_date
+            """
+            res = neo4j_client.run_query(query, {"contract_id": contract_id})
+            if res:
+                return {
+                    "title": res[0].get("title"),
+                    "vendor_name": res[0].get("vendor_name"),
+                    "renewal_date": res[0].get("renewal_date")
+                }
+        except Exception as e:
+            print(f"[WARN] Failed to query contract details from Neo4j: {e}")
+
+    try:
+        import json
+        from config import WORKFLOW_DB_PATH
+        _WORKFLOW_DIR = Path(WORKFLOW_DB_PATH).parent / "workflow_states"
+        path = _WORKFLOW_DIR / f"{contract_id}.json"
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            meta = data.get("contract_meta", {})
+            return {
+                "title": meta.get("title") or meta.get("filename"),
+                "vendor_name": meta.get("vendor_name") or "Unknown Vendor",
+                "renewal_date": meta.get("renewal_date")
+            }
+    except Exception as e:
+        print(f"[ERROR] Failed to load contract details from workflow JSON: {e}")
+
+    return {
+        "title": "Unknown Contract",
+        "vendor_name": "Unknown Vendor",
+        "renewal_date": None
+    }
+
+
+async def check_and_fire_alerts():
+    import json
+    from config import WORKFLOW_DB_PATH
+    from workflow.alerts import alert_manager
+
+    _WORKFLOW_DIR = Path(WORKFLOW_DB_PATH).parent / "workflow_states"
+    if not _WORKFLOW_DIR.exists():
+        return
+
+    now = datetime.now(timezone.utc)
+    neo4j = get_neo4j_client()
+
+    for path in _WORKFLOW_DIR.glob("*.json"):
+        try:
+            contract_id = path.stem
+            data = json.loads(path.read_text(encoding="utf-8"))
+            meta = data.get("contract_meta")
+            if not meta:
+                continue
+
+            renewal_date_str = meta.get("renewal_date")
+            if not renewal_date_str:
+                continue
+
+            renewal_dt = parse_date(renewal_date_str)
+            if not renewal_dt:
+                continue
+
+            triggers = calculate_trigger_dates(renewal_dt)
+
+            for alert_type, trigger_dt in triggers.items():
+                if now >= trigger_dt:
+                    if not alert_manager.has_alert_fired(contract_id, alert_type):
+                        alert_id = str(uuid.uuid4())[:8]
+                        fired_at_str = now.isoformat()
+
+                        # SQLite store
+                        alert_manager.create_alert(
+                            alert_id=alert_id,
+                            contract_id=contract_id,
+                            alert_type=alert_type,
+                            fired_at=fired_at_str,
+                            status="unseen"
+                        )
+
+                        # Neo4j store
+                        if neo4j and neo4j.is_connected:
+                            try:
+                                neo4j.create_alert(
+                                    alert_id=alert_id,
+                                    contract_id=contract_id,
+                                    alert_type=alert_type,
+                                    fired_at=fired_at_str,
+                                    status="unseen"
+                                )
+                            except Exception as e:
+                                print(f"[ERROR] Failed to write alert to Neo4j: {e}")
+
+                        # SQLite Audit
+                        audit = get_audit_log()
+                        audit.log_event(
+                            workflow_id=contract_id,
+                            step="renewal_watch",
+                            action="alert_fired",
+                            details=f"Renewal alert of type {alert_type} fired. Status: unseen."
+                        )
+
+                        # Neo4j AuditEvent
+                        if neo4j and neo4j.is_connected:
+                            try:
+                                neo4j.log_audit_event(
+                                    contract_id=contract_id,
+                                    action="alert_fired",
+                                    details=f"Renewal alert of type {alert_type} fired."
+                                )
+                            except Exception as e:
+                                print(f"[ERROR] Failed to write AuditEvent to Neo4j: {e}")
+        except Exception as e:
+            print(f"[ERROR] Error processing contract alert for path {path}: {e}")
+
+
+async def run_renewal_watch_loop():
+    print("[INFO] Starting renewal watch background loop...")
+    while True:
+        try:
+            await check_and_fire_alerts()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[ERROR] Error in renewal watch background check: {e}")
+        await asyncio.sleep(10)
+
+
+# ---------------------------------------------------------------------------
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # Application lifecycle
 # ---------------------------------------------------------------------------
 
@@ -143,11 +329,26 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] Neo4j schema init failed: {e}")
 
+<<<<<<< HEAD
+=======
+    # Start renewal watch loop task
+    loop_task = asyncio.create_task(run_renewal_watch_loop())
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     print(f"[INFO] {APP_NAME} ready on port {PORT}")
 
     yield
 
     # Shutdown
+<<<<<<< HEAD
+=======
+    loop_task.cancel()
+    try:
+        await loop_task
+    except asyncio.CancelledError:
+        pass
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     if _neo4j_client:
         _neo4j_client.close()
     print(f"[INFO] {APP_NAME} shutting down")
@@ -323,10 +524,17 @@ async def api_contract_clauses(contract_id: str, user: dict = Depends(get_curren
         raise HTTPException(404, "Contract not found")
     return {
         "contract_id": contract_id,
+<<<<<<< HEAD
         "status": workflow.get("status", "unknown"),
         "risk_flags": workflow.get("risk_flags", []),
         "contradictions": workflow.get("contradictions", []),
         "privacy_logs": workflow.get("privacy_logs", []),
+=======
+        "status": workflow.status,
+        "risk_flags": workflow.risk_flags,
+        "contradictions": workflow.contradictions,
+        "privacy_logs": workflow.privacy_logs,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     }
 
 
@@ -343,7 +551,11 @@ async def api_submit_review(
     if not workflow:
         raise HTTPException(404, "Contract not found")
 
+<<<<<<< HEAD
     if workflow.get("status") != WorkflowStatus.PAUSED_FOR_REVIEW:
+=======
+    if workflow.status != WorkflowStatus.PAUSED_FOR_REVIEW:
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         raise HTTPException(400, "Contract is not awaiting review")
 
     # Log each decision to audit
@@ -490,6 +702,112 @@ async def api_hinglish(
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
+# RENEWAL ALERTS
+# ---------------------------------------------------------------------------
+
+@app.get("/api/contracts/alerts")
+async def api_get_alerts(user: dict = Depends(get_current_user)):
+    """Retrieve all unseen renewal alerts."""
+    from workflow.alerts import alert_manager
+    alerts = alert_manager.get_unseen_alerts()
+    result = []
+    
+    neo4j = get_neo4j_client()
+    now = datetime.now(timezone.utc)
+    
+    for alert in alerts:
+        details = get_contract_details(alert["contract_id"], neo4j)
+        renewal_date_str = details.get("renewal_date")
+        days_remaining = None
+        time_label = "N/A"
+        
+        if renewal_date_str:
+            renewal_dt = parse_date(renewal_date_str)
+            if renewal_dt:
+                diff = renewal_dt - now
+                diff_seconds = diff.total_seconds()
+                time_label = get_time_remaining_label(diff_seconds)
+                
+                # Compute days_remaining for color indicators in frontend
+                if diff_seconds < 86400:
+                    # In seconds (near-future test scale):
+                    # < 30 seconds: Red indicator
+                    # 30-60 seconds: Yellow indicator
+                    # 60-90 seconds: Green indicator
+                    if diff_seconds <= 30:
+                        days_remaining = 15
+                    elif diff_seconds <= 60:
+                        days_remaining = 45
+                    else:
+                        days_remaining = 75
+                else:
+                    days_remaining = diff.days
+                    
+        result.append({
+            "id": alert["id"],
+            "contract_id": alert["contract_id"],
+            "contract_title": details.get("title") or "Untitled Contract",
+            "vendor_name": details.get("vendor_name") or "Unknown Vendor",
+            "alert_type": alert["alert_type"],
+            "fired_at": alert["fired_at"],
+            "status": alert["status"],
+            "days_remaining": days_remaining,
+            "time_label": time_label
+        })
+        
+    return {"alerts": result}
+
+
+@app.post("/api/contracts/alerts/{alert_id}/seen")
+async def api_mark_alert_seen(alert_id: str, user: dict = Depends(get_current_user)):
+    """Mark a renewal alert as seen and log this to SQLite and Neo4j audit trails."""
+    from workflow.alerts import alert_manager
+    alert = alert_manager.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+        
+    # SQLite status update
+    alert_manager.mark_alert_seen(alert_id)
+    
+    # Neo4j status update
+    neo4j = get_neo4j_client()
+    if neo4j and neo4j.is_connected:
+        try:
+            neo4j.mark_alert_seen_neo4j(alert_id)
+        except Exception as e:
+            print(f"[WARN] Failed to mark alert seen in Neo4j: {e}")
+            
+    # SQLite Audit Log
+    audit = get_audit_log()
+    audit.log_event(
+        workflow_id=alert["contract_id"],
+        step="renewal_watch",
+        action="alert_seen",
+        details=f"Alert of type {alert['alert_type']} marked as seen.",
+        reviewer_id=user["username"],
+        reviewer_name=user["display_name"]
+    )
+    
+    # Neo4j AuditEvent
+    if neo4j and neo4j.is_connected:
+        try:
+            neo4j.log_audit_event(
+                contract_id=alert["contract_id"],
+                action="alert_seen",
+                details=f"Alert of type {alert['alert_type']} marked as seen.",
+                reviewer_id=user["username"],
+                reviewer_name=user["display_name"]
+            )
+        except Exception as e:
+            print(f"[WARN] Failed to write AuditEvent to Neo4j: {e}")
+            
+    return {"message": "Alert marked as seen", "status": "seen"}
+
+
+# ---------------------------------------------------------------------------
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # AUDIT TRAIL
 # ---------------------------------------------------------------------------
 

@@ -85,6 +85,16 @@ class WorkflowEngine:
         contract_id: str,
         file_path: str,
         filename: str,
+<<<<<<< HEAD
+=======
+        vendor_name: Optional[str] = None,
+        contract_title: Optional[str] = None,
+        renewal_date: Optional[str] = None,
+        embedder: Any = None,
+        faiss_store: Any = None,
+        risk_analyzer: Any = None,
+        neo4j_client: Any = None,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     ) -> WorkflowState:
         """Start a new contract review workflow.
 
@@ -96,6 +106,16 @@ class WorkflowEngine:
             contract_id: Unique identifier for the contract.
             file_path:   Absolute path to the uploaded file on disk.
             filename:    Original filename (used to detect file type).
+<<<<<<< HEAD
+=======
+            vendor_name: Optional vendor name override.
+            contract_title: Optional contract title override.
+            renewal_date: Optional renewal date override.
+            embedder: Embedder service.
+            faiss_store: Vector store service.
+            risk_analyzer: AI analysis service.
+            neo4j_client: Neo4j graph client.
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         Returns:
             The current :class:`WorkflowState` — may be
@@ -123,7 +143,11 @@ class WorkflowEngine:
         from workflow.steps import step_ingest
 
         workflow = self._execute_step(
+<<<<<<< HEAD
             workflow, "ingest", step_ingest, workflow, file_path
+=======
+            workflow, "ingest", step_ingest, workflow, file_path, vendor_name, contract_title, renewal_date
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -132,7 +156,11 @@ class WorkflowEngine:
         from workflow.steps import step_embed_and_search
 
         workflow = self._execute_step(
+<<<<<<< HEAD
             workflow, "embed_and_search", step_embed_and_search, workflow, None, None
+=======
+            workflow, "embed_and_search", step_embed_and_search, workflow, embedder, faiss_store
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -141,7 +169,11 @@ class WorkflowEngine:
         from workflow.steps import step_risk_analysis
 
         workflow = self._execute_step(
+<<<<<<< HEAD
             workflow, "risk_analysis", step_risk_analysis, workflow, None
+=======
+            workflow, "risk_analysis", step_risk_analysis, workflow, risk_analyzer
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -155,6 +187,13 @@ class WorkflowEngine:
         # After human_approval the status is PAUSED_FOR_REVIEW
         return workflow
 
+<<<<<<< HEAD
+=======
+    def list_workflows(self) -> List[WorkflowState]:
+        """Return a list of all loaded workflow states."""
+        return list(self._workflows.values())
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     def get_workflow(self, contract_id: str) -> Optional[WorkflowState]:
         """Retrieve the current state of a workflow.
 
@@ -178,6 +217,13 @@ class WorkflowEngine:
         contract_id: str,
         review_decisions: List[ClauseReviewDecision],
         reviewer: Dict[str, str],
+<<<<<<< HEAD
+=======
+        vendor_name: Optional[str] = None,
+        contract_title: Optional[str] = None,
+        renewal_date: Optional[str] = None,
+        neo4j_client: Any = None,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     ) -> WorkflowState:
         """Resume a workflow after human approval.
 
@@ -189,6 +235,13 @@ class WorkflowEngine:
             contract_id:      Identifier of the paused workflow.
             review_decisions: The reviewer's decisions on flagged clauses.
             reviewer:         Dict with ``id`` and ``name`` keys.
+<<<<<<< HEAD
+=======
+            vendor_name:      Optional vendor name override.
+            contract_title:   Optional contract title override.
+            renewal_date:     Optional renewal date override.
+            neo4j_client:     Neo4j graph client.
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         Returns:
             The final :class:`WorkflowState` (should be ``COMPLETED``
@@ -213,6 +266,18 @@ class WorkflowEngine:
         workflow.steps["human_approval"] = StepStatus.SUCCEEDED
         workflow.current_step = STEP_NAMES.index("graph_write")
         workflow.updated_at = datetime.now(timezone.utc)
+<<<<<<< HEAD
+=======
+
+        if workflow.contract_meta:
+            if vendor_name:
+                workflow.contract_meta.vendor_name = vendor_name
+            if contract_title:
+                workflow.contract_meta.title = contract_title
+            if renewal_date:
+                workflow.contract_meta.renewal_date = renewal_date
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         self._save_state(workflow)
 
         self.audit_log.log_event(
@@ -228,7 +293,11 @@ class WorkflowEngine:
         from workflow.steps import step_graph_write
 
         workflow = self._execute_step(
+<<<<<<< HEAD
             workflow, "graph_write", step_graph_write, workflow, None
+=======
+            workflow, "graph_write", step_graph_write, workflow, neo4j_client
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow

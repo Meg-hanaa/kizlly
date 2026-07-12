@@ -36,6 +36,7 @@ const UploadView = {
                 <div class="card p-lg">
                     <h3 style="margin-top:0;">Upload Contract</h3>
                     <form id="upload-form">
+<<<<<<< HEAD
                         <div id="drop-zone" class="upload-drop-zone">
                             <span style="font-size: 2.5rem; margin-bottom: 10px;"></span>
                             <strong>Drag & drop your contract here</strong>
@@ -43,15 +44,27 @@ const UploadView = {
                             <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" style="display:none;" />
                         </div>
                         
+=======
+                        <div class="form-group">
+                            <label for="file-input">Contract Document (PDF, DOCX, TXT) *</label>
+                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: block; width: 100%; border: 2px solid var(--border-color); padding: 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); cursor: pointer;" />
+                        </div>
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                         <div class="form-group">
                             <label for="vendor-name">Counterparty / Vendor Name *</label>
                             <input type="text" id="vendor-name" placeholder="e.g., Acme Corporation" required />
                         </div>
+<<<<<<< HEAD
                         
+=======
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                         <div class="form-group">
                             <label for="contract-title">Contract Title / Reference *</label>
                             <input type="text" id="contract-title" placeholder="e.g., Master Services Agreement 2026" required />
                         </div>
+<<<<<<< HEAD
                         
                         <div class="form-group">
                             <label for="renewal-date">Target Renewal Date</label>
@@ -62,6 +75,22 @@ const UploadView = {
                     </form>
                 </div>
                 
+=======
+
+                        <div class="form-group">
+                            <label for="renewal-date">Target Renewal Date</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="datetime-local" id="renewal-date" style="flex-grow: 1;" />
+                                <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
+                            </div>
+                            <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Select a calendar date, or click the button to set the renewal to 3 minutes in the future for testing.</span>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width:100%;"> Start Intelligence Pipeline</button>
+                    </form>
+                </div>
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 <!-- Active Pipelines List -->
                 <div class="card p-lg">
                     <h3 style="margin-top:0;">Active Pipelines</h3>
@@ -77,6 +106,7 @@ const UploadView = {
     },
 
     setupUploadHandlers() {
+<<<<<<< HEAD
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const uploadForm = document.getElementById('upload-form');
@@ -116,6 +146,37 @@ const UploadView = {
                 e.preventDefault();
                 if (!selectedFile) {
                     App.showToast('Please select or drop a file to upload.', 'error');
+=======
+        const fileInput = document.getElementById('file-input');
+        const uploadForm = document.getElementById('upload-form');
+
+        // Demo date generator
+        const setDemoBtn = document.getElementById('set-demo-date-btn');
+        if (setDemoBtn) {
+            setDemoBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const now = new Date();
+                const future = new Date(now.getTime() + 3 * 60 * 1000); // 3 minutes in future
+                
+                const year = future.getFullYear();
+                const month = String(future.getMonth() + 1).padStart(2, '0');
+                const day = String(future.getDate()).padStart(2, '0');
+                const hours = String(future.getHours()).padStart(2, '0');
+                const minutes = String(future.getMinutes()).padStart(2, '0');
+                
+                const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+                document.getElementById('renewal-date').value = formatted;
+                App.showToast('Test renewal date set to 3 minutes in the future!', 'success');
+            });
+        }
+
+        if (uploadForm && fileInput) {
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const file = fileInput.files[0];
+                if (!file) {
+                    App.showToast('Please select a file to upload.', 'error');
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                     return;
                 }
 
@@ -125,6 +186,7 @@ const UploadView = {
 
                 try {
                     App.showToast('Uploading contract and starting workflow...', 'info');
+<<<<<<< HEAD
                     const res = await API.uploadContract(selectedFile, vendorName, contractTitle, renewalDate);
                     App.showToast(res.message, 'success');
                     
@@ -132,6 +194,13 @@ const UploadView = {
                     selectedFile = null;
                     uploadForm.reset();
                     this.updateDropZoneLabel(dropZone, 'Drag & drop your contract here');
+=======
+                    const res = await API.uploadContract(file, vendorName, contractTitle, renewalDate);
+                    App.showToast(res.message, 'success');
+                    
+                    // Reset upload state
+                    uploadForm.reset();
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                     
                     await this.loadActivePipelines();
                 } catch (err) {
@@ -141,11 +210,14 @@ const UploadView = {
         }
     },
 
+<<<<<<< HEAD
     updateDropZoneLabel(dropZone, text) {
         const textNode = dropZone.querySelector('strong');
         if (textNode) textNode.textContent = text;
     },
 
+=======
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     async loadActivePipelines() {
         const listContainer = document.getElementById('pipelines-list');
         if (!listContainer) return;
@@ -260,6 +332,10 @@ const UploadView = {
             </div>
         `;
 
+<<<<<<< HEAD
+=======
+        const reviewContainer = document.getElementById('review-container');
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         try {
             const workflow = await API.getContractStatus(contractId);
             const clausesData = await API.getContractClauses(contractId);
@@ -267,7 +343,10 @@ const UploadView = {
             const titleDisplay = document.getElementById('review-title-display');
             if (titleDisplay) titleDisplay.textContent = workflow.contract_meta?.title || workflow.contract_meta?.filename || 'Contract';
 
+<<<<<<< HEAD
             const reviewContainer = document.getElementById('review-container');
+=======
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             if (!reviewContainer) return;
 
             const stepsHtml = this.renderWorkflowSteps(workflow.steps || []);
@@ -360,10 +439,17 @@ const UploadView = {
                 </div>
 
                 <!-- Action Bar -->
+<<<<<<< HEAD
                 <div class="card p-lg flex-between" style="position:sticky; bottom:20px; z-index:100; background:rgba(30, 41, 59, 0.95); backdrop-filter:blur(10px); margin-top: 30px;">
                     <div style="max-width: 60%;">
                         <strong style="color:var(--text-primary); display:block; margin-bottom:4px;">Ready to Commit to Graph Ledger?</strong>
                         <span style="font-size:0.8rem; color:var(--text-secondary);">Approving and committing writes the data model to Neo4j. Rejected clauses are marked as negotiation-critical.</span>
+=======
+                <div class="card p-lg" style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-tertiary);">
+                    <div>
+                        <strong style="color:#000000; display:block; margin-bottom:4px;">Ready to Commit to Graph Ledger?</strong>
+                        <span style="font-size:0.8rem; color:#000000;">Approving and committing writes the data model to Neo4j. Rejected clauses are marked as negotiation-critical.</span>
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                     </div>
                     <button class="btn btn-primary" onclick="UploadView.submitReview('${contractId}')"> Commit Decisions & Resume Pipeline</button>
                 </div>
@@ -394,12 +480,25 @@ const UploadView = {
             "Audit Trail Finalize"
         ];
 
+<<<<<<< HEAD
+=======
+        const stepKeys = ["ingest", "embed_and_search", "risk_analysis", "human_approval", "graph_write", "audit_finalize"];
+        const stepsArray = Array.isArray(steps) ? steps : stepKeys.map(key => ({
+            status: steps[key] || 'queued',
+            retry_count: 0
+        }));
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         let html = '<div class="workflow-steps-progress" style="display:flex; justify-content:space-between; margin-top:20px; position:relative;">';
         
         // Background line
         html += '<div style="position:absolute; top:15px; left:0; right:0; height:2px; background:var(--bg-tertiary); z-index:1;"></div>';
 
+<<<<<<< HEAD
         steps.forEach((step, index) => {
+=======
+        stepsArray.forEach((step, index) => {
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             let statusClass = 'step-pending';
             let statusSymbol = index + 1;
 

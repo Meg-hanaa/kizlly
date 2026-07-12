@@ -21,14 +21,64 @@ const DashboardView = {
                     <h2>Portfolio Risk Intelligence</h2>
                     <p>Aggregated contract risk metrics powered by Cypher graph queries.</p>
                 </div>
+<<<<<<< HEAD
                 <span class="badge badge-low" style="padding: 6px 12px; font-weight:600;"> Graph-Native Store (Neo4j)</span>
             </div>
             
+=======
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <!-- Notification Bell -->
+                    <div class="bell-container" id="dashboardBellContainer" style="position: relative;">
+                        <button class="btn btn-outline" id="dashboardBellBtn" style="padding: 8px 12px; display: flex; align-items: center; gap: 6px; position: relative;">
+                            🔔 <span id="dashboardBellCount" class="badge badge-critical" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 50%; display: none;">0</span>
+                        </button>
+                        <div id="dashboardBellDropdown" class="card" style="display: none; position: absolute; right: 0; top: 45px; width: 320px; z-index: 100; border: 2px solid var(--border-color); box-shadow: var(--shadow-md); padding: 12px; background: var(--bg-secondary); text-align: left;">
+                            <h4 style="margin: 0 0 10px 0; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Renewal Alerts</span>
+                                <span class="badge badge-low" id="dashboardBellCountLabel" style="font-size:0.75rem;">0 unseen</span>
+                            </h4>
+                            <div id="dashboardBellList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Alerts -->
+                            </div>
+                        </div>
+                    </div>
+                    <span class="badge badge-low" style="padding: 6px 12px; font-weight:600;"> Graph-Native Store (Neo4j)</span>
+                </div>
+            </div>
+            
+            <div id="alerts-panel"></div>
+            
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             <div id="dashboard-content">
                 <div class="spinner-container"><div class="spinner"></div></div>
             </div>
         `;
 
+<<<<<<< HEAD
+=======
+        // Setup dropdown toggle
+        const bellBtn = document.getElementById('dashboardBellBtn');
+        const bellDropdown = document.getElementById('dashboardBellDropdown');
+        if (bellBtn && bellDropdown) {
+            bellBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isShowing = bellDropdown.style.display === 'block';
+                bellDropdown.style.display = isShowing ? 'none' : 'block';
+            });
+            document.addEventListener('click', () => {
+                bellDropdown.style.display = 'none';
+            });
+            bellDropdown.addEventListener('click', (e) => {
+                e.stopPropagation(); // Avoid closing when clicking inside
+            });
+        }
+
+        // Trigger immediate Alerts fetch and rendering
+        if (typeof AlertManager !== 'undefined') {
+            AlertManager.loadAlerts();
+        }
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         try {
             const stats = await API.getDashboard();
             const vendors = await API.getVendorExposure();

@@ -35,14 +35,28 @@ logger = logging.getLogger(__name__)
 def step_ingest(
     workflow: WorkflowState,
     file_path: str,
+<<<<<<< HEAD
 ) -> WorkflowState:
     """Parse an uploaded contract and extract raw text.
+=======
+    vendor_name: Optional[str] = None,
+    contract_title: Optional[str] = None,
+    renewal_date: Optional[str] = None,
+) -> WorkflowState:
+    """Parse an uploaded contract and extract raw text and metadata.
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Chooses the parser based on file extension (``.pdf`` or ``.docx``).
 
     Args:
         workflow:  Current workflow state.
         file_path: Absolute path to the uploaded file.
+<<<<<<< HEAD
+=======
+        vendor_name: Counterparty name.
+        contract_title: Title of the contract.
+        renewal_date: Target renewal date (optional manual override).
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Returns:
         Updated :class:`WorkflowState` with ``extracted_text`` and
@@ -65,6 +79,7 @@ def step_ingest(
     elif ext in (".docx", ".doc"):
         from ingestion.docx_parser import parse_docx
         text = parse_docx(file_path)
+<<<<<<< HEAD
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
@@ -76,6 +91,80 @@ def step_ingest(
         filename=filename,
         title=filename.rsplit(".", 1)[0],
         total_chars=len(text),
+=======
+    elif ext == ".txt":
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    # Extract renewal details using Groq LLM (LLaMA 3.3 70B)
+    extracted_renewal_date = None
+    extracted_notice_deadline = None
+    auto_renewal = None
+
+    try:
+        from llm.groq_client import GroqClient
+        groq = GroqClient()
+        snippet = text[:15000] # Send first 15k characters which contain terms/deadlines
+        system_prompt = (
+            "You are a legal contract assistant. Today's date is 2026-07-12.\n"
+            "Analyze the contract text to extract:\n"
+            "1. The next renewal or expiration date.\n"
+            "2. Whether there is an auto-renewal clause.\n"
+            "3. The notice-period deadline (when notice of non-renewal must be given, e.g. if renewal is 2026-12-31 and notice is 30 days prior, the notice deadline is 2026-12-01).\n\n"
+            "Format dates as YYYY-MM-DD. Return a JSON object with keys:\n"
+            '- "renewal_date": "YYYY-MM-DD" or null\n'
+            '- "auto_renewal": true/false or null\n'
+            '- "notice_deadline": "YYYY-MM-DD" or null\n\n'
+            "Return ONLY valid JSON, no markdown fences or extra text."
+        )
+        response_raw = groq.chat(system_prompt=system_prompt, user_prompt=snippet)
+
+        from llm.risk_analyzer import _parse_json_response
+        extracted_data = _parse_json_response(response_raw)
+
+        extracted_renewal_date = extracted_data.get("renewal_date")
+        extracted_notice_deadline = extracted_data.get("notice_deadline")
+        auto_renewal = extracted_data.get("auto_renewal")
+
+        logger.info(
+            "[ingest] Extracted dates: renewal_date=%s, notice_deadline=%s, auto_renewal=%s",
+            extracted_renewal_date, extracted_notice_deadline, auto_renewal
+        )
+
+        # Log outbound data for privacy transparency
+        from models import PrivacyLog
+        workflow.privacy_logs.append(
+            PrivacyLog(
+                workflow_id=workflow.contract_id,
+                timestamp=datetime.now(timezone.utc),
+                api="groq_ingest",
+                chars_sent=len(system_prompt) + len(snippet),
+                chunk_count=1,
+                chunks_preview=[snippet[:50]],
+            )
+        )
+    except Exception as exc:
+        logger.warning("[ingest] Date extraction using Groq LLaMA failed (non-fatal): %s", exc)
+
+    # Build contract metadata
+    filename = os.path.basename(file_path)
+    workflow.extracted_text = text
+    
+    final_renewal_date = renewal_date or extracted_renewal_date
+    final_notice_deadline = extracted_notice_deadline
+
+    workflow.contract_meta = ContractMetadata(
+        id=workflow.contract_id,
+        filename=filename,
+        title=contract_title or filename.rsplit(".", 1)[0],
+        vendor_name=vendor_name or "Unknown Vendor",
+        total_chars=len(text),
+        renewal_date=final_renewal_date,
+        notice_deadline=final_notice_deadline,
+        auto_renewal=auto_renewal,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     )
     workflow.updated_at = datetime.now(timezone.utc)
 
@@ -342,7 +431,21 @@ def step_graph_write(
                 expiration_date=None,
                 value=0.0,
                 status=meta.status.value if meta.status else "Active",
+<<<<<<< HEAD
             )
+=======
+                renewal_date=getattr(meta, "renewal_date", None),
+                notice_deadline=getattr(meta, "notice_deadline", None),
+            )
+            
+            # Create RENEWS_ON relationship if renewal_date is present
+            renewal_date_val = getattr(meta, "renewal_date", None)
+            if renewal_date_val:
+                try:
+                    neo4j_client.set_renewal_date(meta.id, renewal_date_val)
+                except Exception as ex:
+                    logger.warning("[graph_write] Failed to set renewal date relationship: %s", ex)
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         # Create clause + risk nodes for approved clauses only
         for risk_flag in workflow.risk_flags:

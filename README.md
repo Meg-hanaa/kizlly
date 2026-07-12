@@ -11,9 +11,15 @@ Kizlly is a local-first, privacy-respecting contract audit platform. It allows l
 Kizlly is built to bridge the gap between AI capability and corporate data security. Typical legal AI systems require uploading complete, highly confidential agreements to cloud servers, risking exposure of trade secrets and compliance violations. 
 
 Kizlly solves this by processing contracts through an isolated, multi-stage hybrid RAG pipeline:
+<<<<<<< HEAD
 - **Local Embedding & Chunker**: Documents are ingested and parsed directly inside your private host environment (whether run locally on your PC or inside a hosted cloud container). Text is split semantically and encoded using a local embedding model, ensuring raw contract text remains secure and isolated.
 - **Anonymized API Audit**: Only small, isolated clause chunks containing suspected risks are sent to external LLMs for classification, rate-limited and logged.
 - **Durable Orchestration Engine**: Every step of the review process is managed by a durable workflow controller that persists progress, allowing the pipeline to resume from the exact failed checkpoint if network drops or LLM limits are hit.
+=======
+- **Local Embedding & Chunker**: Documents are ingested locally. Text is split semantically and encoded into vector embeddings directly on the host machine using localized models, keeping the bulk of the raw contract confidential.
+- **Anonymized API Audit**: Only small, isolated clause chunks containing suspected risks are sent to LLMs for classification, rate-limited and tracked inside a transparency ledger.
+- **Durable Orchestration Engine**: Every step of the review process is managed by a durable workflow controller. If network connections drop or LLM limits are hit, progress is saved, allowing reviewers to resume from the exact checkpoint.
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 - **Relational Graph Modeling**: Approved compliance data is automatically synchronized to a Neo4j graph database, converting static legal text into a live dashboard showing active vendor risks, renewals, and liability concentrations.
 
 ---
@@ -126,6 +132,7 @@ Highlight the most important features of your project:
 
 ---
 
+<<<<<<< HEAD
 ## Deployment and Cloud Infrastructure
 
 When deploying Kizlly to a cloud production environment (such as Render, AWS, or GCP):
@@ -136,6 +143,8 @@ When deploying Kizlly to a cloud production environment (such as Render, AWS, or
 
 ---
 
+=======
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 ## How to Run the Project
 
 ### Requirements:
@@ -173,7 +182,11 @@ When deploying Kizlly to a cloud production environment (such as Render, AWS, or
    ```
 
 4. **Run the Application**:
+<<<<<<< HEAD
    Start the FastAPI backend server. Note that **the backend server hosts both the API endpoints and serves the frontend dashboard directly**, so you do not need to run a separate frontend server:
+=======
+   Start the FastAPI backend server (which also serves the static frontend dashboard):
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
    ```bash
    python app.py
    ```

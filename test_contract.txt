@@ -1,0 +1,4 @@
+This is a standard service agreement between Acme Corporation and Kizlly.
+This contract is effective as of July 12, 2026.
+It shall automatically renew on August 15, 2026 unless either party gives written notice of non-renewal at least 30 days prior to the expiration date.
+Liability of Acme Corporation shall be limited to $10,000.

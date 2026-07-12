@@ -121,7 +121,14 @@ class Neo4jClient:
         if not self.is_connected:
             return False
         try:
+<<<<<<< HEAD
             with self._driver.session(database=NEO4J_DATABASE) as session:
+=======
+            session_kwargs = {}
+            if NEO4J_DATABASE and NEO4J_DATABASE != "neo4j":
+                session_kwargs["database"] = NEO4J_DATABASE
+            with self._driver.session(**session_kwargs) as session:
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 session.run("RETURN 1 AS ok").consume()
             logger.info("Neo4j connection verified.")
             return True
@@ -153,7 +160,14 @@ class Neo4jClient:
 
         params = params or {}
         try:
+<<<<<<< HEAD
             with self._driver.session(database=NEO4J_DATABASE) as session:
+=======
+            session_kwargs = {}
+            if NEO4J_DATABASE and NEO4J_DATABASE != "neo4j":
+                session_kwargs["database"] = NEO4J_DATABASE
+            with self._driver.session(**session_kwargs) as session:
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 result = session.run(query, **params)
                 return [record.data() for record in result]
         except (ServiceUnavailable, Neo4jError) as exc:
@@ -175,6 +189,11 @@ class Neo4jClient:
         expiration_date: Optional[str] = None,
         value: float = 0.0,
         status: str = "Active",
+<<<<<<< HEAD
+=======
+        renewal_date: Optional[str] = None,
+        notice_deadline: Optional[str] = None,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     ) -> List[Dict[str, Any]]:
         """MERGE a Vendor, CREATE a Contract, and link them.
 
@@ -188,6 +207,11 @@ class Neo4jClient:
             expiration_date: ISO date string (YYYY-MM-DD) or ``None``.
             value:           Monetary value of the contract.
             status:          Contract status label.
+<<<<<<< HEAD
+=======
+            renewal_date:    Optional ISO renewal date.
+            notice_deadline: Optional ISO notice deadline.
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         Returns:
             Query result records.
@@ -201,6 +225,11 @@ class Neo4jClient:
             expirationDate: $expiration_date,
             value: $value,
             status: $status,
+<<<<<<< HEAD
+=======
+            renewal_date: $renewal_date,
+            notice_deadline: $notice_deadline,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             createdAt: datetime()
         })
         CREATE (c)-[:WITH_VENDOR]->(v)
@@ -215,6 +244,11 @@ class Neo4jClient:
             "expiration_date": expiration_date,
             "value": value,
             "status": status,
+<<<<<<< HEAD
+=======
+            "renewal_date": renewal_date,
+            "notice_deadline": notice_deadline,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         })
 
     # ------------------------------------------------------------------ #
@@ -327,6 +361,75 @@ class Neo4jClient:
             "renewal_date": renewal_date,
         })
 
+<<<<<<< HEAD
+=======
+    def create_alert(
+        self,
+        alert_id: str,
+        contract_id: str,
+        alert_type: str,
+        fired_at: str,
+        status: str = "unseen",
+    ) -> List[Dict[str, Any]]:
+        """CREATE an Alert node and link it to the Contract node."""
+        query = """
+        MATCH (c:Contract {id: $contract_id})
+        CREATE (a:Alert {
+            id: $alert_id,
+            type: $alert_type,
+            fired_at: $fired_at,
+            status: $status
+        })
+        CREATE (c)-[:HAS_ALERT]->(a)
+        RETURN a.id AS alertId
+        """
+        return self.run_query(query, {
+            "alert_id": alert_id,
+            "contract_id": contract_id,
+            "alert_type": alert_type,
+            "fired_at": fired_at,
+            "status": status,
+        })
+
+    def mark_alert_seen_neo4j(self, alert_id: str) -> List[Dict[str, Any]]:
+        """Update an Alert node status to 'seen'."""
+        query = """
+        MATCH (a:Alert {id: $alert_id})
+        SET a.status = "seen"
+        RETURN a.id AS alertId
+        """
+        return self.run_query(query, {"alert_id": alert_id})
+
+    def log_audit_event(
+        self,
+        contract_id: str,
+        action: str,
+        details: str,
+        reviewer_id: Optional[str] = None,
+        reviewer_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """CREATE an AuditEvent node linked to the Contract node."""
+        query = """
+        MATCH (c:Contract {id: $contract_id})
+        CREATE (ae:AuditEvent {
+            action: $action,
+            details: $details,
+            reviewerId: $reviewer_id,
+            reviewerName: $reviewer_name,
+            timestamp: datetime()
+        })
+        CREATE (c)-[:HAS_AUDIT_EVENT]->(ae)
+        RETURN ae.action AS action
+        """
+        return self.run_query(query, {
+            "contract_id": contract_id,
+            "action": action,
+            "details": details,
+            "reviewer_id": reviewer_id,
+            "reviewer_name": reviewer_name,
+        })
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     # ------------------------------------------------------------------ #
     # Visualisation
     # ------------------------------------------------------------------ #
@@ -363,6 +466,17 @@ class Neo4jClient:
             properties(r) AS props
         """
 
+<<<<<<< HEAD
+=======
+        def serialize_prop(v):
+            if hasattr(v, "isoformat"):
+                return v.isoformat()
+            elif isinstance(v, (str, int, float, bool)) or v is None:
+                return v
+            else:
+                return str(v)
+
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         nodes: List[Dict[str, Any]] = []
         edges: List[Dict[str, Any]] = []
 
@@ -371,7 +485,12 @@ class Neo4jClient:
             for rec in raw_nodes:
                 node_labels = rec.get("labels", [])
                 props = rec.get("props", {})
+<<<<<<< HEAD
                 node_id = props.get("id") or props.get("name") or rec.get("elementId")
+=======
+                # Use elementId to ensure exact match with edge source/target IDs
+                node_id = rec.get("elementId")
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 node_type = node_labels[0] if node_labels else "Unknown"
                 label = (
                     props.get("title")
@@ -380,20 +499,38 @@ class Neo4jClient:
                     or props.get("date")
                     or str(node_id)
                 )
+<<<<<<< HEAD
+=======
+                # Serialize props to standard JSON types
+                serialized_props = {k: serialize_prop(v) for k, v in props.items()}
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 nodes.append({
                     "id": str(node_id),
                     "label": str(label),
                     "type": node_type,
+<<<<<<< HEAD
                     "properties": props,
+=======
+                    "properties": serialized_props,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 })
 
             raw_edges = self.run_query(edge_query)
             for rec in raw_edges:
+<<<<<<< HEAD
+=======
+                edge_props = rec.get("props", {})
+                serialized_edge_props = {k: serialize_prop(v) for k, v in edge_props.items()}
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 edges.append({
                     "source": str(rec.get("sourceId")),
                     "target": str(rec.get("targetId")),
                     "type": rec.get("relType", "RELATED"),
+<<<<<<< HEAD
                     "properties": rec.get("props", {}),
+=======
+                    "properties": serialized_edge_props,
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                 })
 
         except Exception as exc:

@@ -101,8 +101,14 @@ const API = {
         return this.request('GET', `/api/contracts/${contractId}/clauses`);
     },
 
+<<<<<<< HEAD
     async submitReview(contractId, decisions) {
         return this.request('POST', `/api/contracts/${contractId}/review`, { decisions });
+=======
+    async submitReview(contractId, payload) {
+        const body = Array.isArray(payload) ? { decisions: payload } : payload;
+        return this.request('POST', `/api/contracts/${contractId}/review`, body);
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     async getContracts() {
@@ -141,7 +147,21 @@ const API = {
     },
 
     async getPrivacyLog() {
+<<<<<<< HEAD
         return this.request('GET', '/api/audit/privacy');
+=======
+        return this.request('GET', '/api/privacy/transparency');
+    },
+
+    // ALERTS ENDPOINTS
+
+    async getAlerts() {
+        return this.request('GET', '/api/contracts/alerts');
+    },
+
+    async markAlertSeen(alertId) {
+        return this.request('POST', `/api/contracts/alerts/${alertId}/seen`);
+>>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     // HINGLISH EXPLANATION
