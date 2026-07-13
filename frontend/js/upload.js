@@ -42,8 +42,9 @@ const UploadView = {
                             <div id="drop-zone" class="upload-zone">
                                 <span class="upload-zone-icon">📁</span>
                                 <div class="upload-zone-title">Drag & Drop File Here</div>
-                                <div class="upload-zone-subtitle">or click to browse local files (Max 10MB)</div>
-                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required />
+                                <div class="upload-zone-subtitle" style="margin-bottom: 12px;">or drag your contract directly into this area (Max 10MB)</div>
+                                <button type="button" class="btn btn-outline btn-sm" style="pointer-events: none; margin: 0 auto;">Browse Files</button>
+                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: none;" />
                             </div>
                             <div id="file-name-preview" style="font-size: 0.85rem; color: var(--accent-teal); font-weight: 600; margin-top: 8px; display: none;"></div>
                         </div>
