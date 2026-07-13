@@ -122,9 +122,9 @@ Highlight the most important features of your project:
 
 ## Demo & Deliverables
 
-- **Demo Video Link (Mandatory):** [Insert Link Here]  
-- **Deployment Link (Recommended):** [Insert Link Here]  
-- **Pitch Deck / PPT (Optional):** [Insert Link Here]  
+- **Demo Video Link (Mandatory):** [https://drive.google.com/file/d/1wURQBsKKzRb-KGiJX-ceU4osTWWUiDFR/view]  
+- **Deployment Link (Recommended):** [https://kizlly.onrender.com/]  
+- **Pitch Deck / PPT (Optional):** [https://docs.google.com/presentation/d/1dONDSS003mIZPzV8YieUzZFSr3gl5wEZxtOTy-_Ndug/edit?usp=sharing]  
 
 ---
 
