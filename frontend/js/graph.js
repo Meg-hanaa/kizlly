@@ -132,7 +132,6 @@ const GraphView = {
             d3Svg.transition().call(zoom.transform, d3.zoomIdentity);
         });
 
-        // Map Neo4j nodes/edges to D3 format
         const nodes = data.nodes.map(n => ({
             id: n.id,
             label: n.label,
@@ -140,11 +139,15 @@ const GraphView = {
             properties: n.properties || {}
         }));
 
-        const links = data.edges.map(e => ({
-            source: e.source,
-            target: e.target,
-            type: e.type
-        }));
+        // Filter out links where source or target is not in nodes list to avoid D3 "node not found" crashes
+        const nodeIds = new Set(nodes.map(n => n.id));
+        const links = data.edges
+            .filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+            .map(e => ({
+                source: e.source,
+                target: e.target,
+                type: e.type
+            }));
 
         // Simulation parameters
         this.simulation = d3.forceSimulation(nodes)
