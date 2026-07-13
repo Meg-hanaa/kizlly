@@ -183,25 +183,9 @@ class Neo4jClient:
         status: str = "Active",
         renewal_date: Optional[str] = None,
         notice_deadline: Optional[str] = None,
+        owner: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """MERGE a Vendor, CREATE a Contract, and link them.
-
-        Uses ``MERGE`` on the Vendor so it stays unique across contracts.
-
-        Args:
-            contract_id:     Unique contract identifier.
-            title:           Human-readable contract title.
-            vendor_name:     Vendor / counter-party name.
-            effective_date:  ISO date string (YYYY-MM-DD) or ``None``.
-            expiration_date: ISO date string (YYYY-MM-DD) or ``None``.
-            value:           Monetary value of the contract.
-            status:          Contract status label.
-            renewal_date:    Optional ISO renewal date.
-            notice_deadline: Optional ISO notice deadline.
-
-        Returns:
-            Query result records.
-        """
+        """MERGE a Vendor, CREATE a Contract, and link them."""
         query = """
         MERGE (v:Vendor {name: $vendor_name})
         CREATE (c:Contract {
@@ -213,6 +197,7 @@ class Neo4jClient:
             status: $status,
             renewal_date: $renewal_date,
             notice_deadline: $notice_deadline,
+            owner: $owner,
             createdAt: datetime()
         })
         CREATE (c)-[:WITH_VENDOR]->(v)
@@ -237,6 +222,7 @@ class Neo4jClient:
             "status": status,
             "renewal_date": clean_renewal,
             "notice_deadline": clean_notice,
+            "owner": owner,
         })
 
     # ------------------------------------------------------------------ #
@@ -413,38 +399,71 @@ class Neo4jClient:
     # ------------------------------------------------------------------ #
     # Visualisation
     # ------------------------------------------------------------------ #
-    def get_graph_data(self) -> Dict[str, list]:
-        """Return all nodes and edges for front-end graph visualisation.
-
-        Results are capped at **200 nodes** to keep the payload
-        manageable.
-
-        Returns:
-            ``{"nodes": [...], "edges": [...]}``
-        """
+    def get_graph_data(self, owner: Optional[str] = None) -> Dict[str, list]:
+        """Return all nodes and edges for front-end graph visualisation."""
         if not self.is_connected:
             return {"nodes": [], "edges": []}
 
-        node_query = """
-        MATCH (n)
-        WHERE n:Contract OR n:Vendor OR n:Clause OR n:RiskType OR n:Date
-        WITH n LIMIT 200
-        RETURN
-            elementId(n) AS elementId,
-            labels(n)    AS labels,
-            properties(n) AS props
-        """
-        edge_query = """
-        MATCH (a)-[r]->(b)
-        WHERE (a:Contract OR a:Vendor OR a:Clause OR a:RiskType OR a:Date)
-          AND (b:Contract OR b:Vendor OR b:Clause OR b:RiskType OR b:Date)
-        WITH r, a, b LIMIT 500
-        RETURN
-            elementId(a) AS sourceId,
-            elementId(b) AS targetId,
-            type(r)      AS relType,
-            properties(r) AS props
-        """
+        # Match only contract nodes owned by the user, and trace their immediate dependencies
+        params = {}
+        if owner:
+            node_query = """
+            MATCH (c:Contract {owner: $owner})
+            OPTIONAL MATCH (c)-[r1:WITH_VENDOR]->(v:Vendor)
+            OPTIONAL MATCH (c)-[r2:HAS_CLAUSE]->(cl:Clause)
+            OPTIONAL MATCH (cl)-[r3:FLAGGED_AS]->(rt:RiskType)
+            OPTIONAL MATCH (c)-[r4:RENEWS_ON]->(d:Date)
+            WITH collect(c) + collect(v) + collect(cl) + collect(rt) + collect(d) AS allNodes
+            UNWIND allNodes AS n
+            WITH DISTINCT n
+            WHERE n IS NOT NULL
+            RETURN
+                elementId(n) AS elementId,
+                labels(n)    AS labels,
+                properties(n) AS props
+            LIMIT 200
+            """
+            edge_query = """
+            MATCH (a)-[r]->(b)
+            WHERE (a:Contract OR a:Vendor OR a:Clause OR a:RiskType OR a:Date)
+              AND (b:Contract OR b:Vendor OR b:Clause OR b:RiskType OR b:Date)
+              AND (
+                (a:Contract AND a.owner = $owner) OR
+                (b:Contract AND b.owner = $owner) OR
+                EXISTS {
+                    MATCH (c:Contract {owner: $owner})
+                    WHERE (c)-[*..2]->(a) OR (c)-[*..2]->(b)
+                }
+              )
+            WITH r, a, b LIMIT 500
+            RETURN
+                elementId(a) AS sourceId,
+                elementId(b) AS targetId,
+                type(r)      AS relType,
+                properties(r) AS props
+            """
+            params["owner"] = owner
+        else:
+            node_query = """
+            MATCH (n)
+            WHERE n:Contract OR n:Vendor OR n:Clause OR n:RiskType OR n:Date
+            WITH n LIMIT 200
+            RETURN
+                elementId(n) AS elementId,
+                labels(n)    AS labels,
+                properties(n) AS props
+            """
+            edge_query = """
+            MATCH (a)-[r]->(b)
+            WHERE (a:Contract OR a:Vendor OR a:Clause OR a:RiskType OR a:Date)
+              AND (b:Contract OR b:Vendor OR b:Clause OR b:RiskType OR b:Date)
+            WITH r, a, b LIMIT 500
+            RETURN
+                elementId(a) AS sourceId,
+                elementId(b) AS targetId,
+                type(r)      AS relType,
+                properties(r) AS props
+            """
 
         def serialize_prop(v):
             if hasattr(v, "isoformat"):
@@ -457,11 +476,10 @@ class Neo4jClient:
         edges: List[Dict[str, Any]] = []
 
         try:
-            raw_nodes = self.run_query(node_query)
+            raw_nodes = self.run_query(node_query, params)
             for rec in raw_nodes:
                 node_labels = rec.get("labels", [])
                 props = rec.get("props", {})
-                # Use elementId to ensure exact match with edge source/target IDs
                 node_id = rec.get("elementId")
                 node_type = node_labels[0] if node_labels else "Unknown"
                 label = (
@@ -471,8 +489,7 @@ class Neo4jClient:
                     or props.get("date")
                     or str(node_id)
                 )
-                # Serialize props to standard JSON types
-                serialized_props = {k: serialize_prop(v) for k, v in props.items()}
+                serialized_props = {k: serialize_prop(val) for k, val in props.items()}
                 nodes.append({
                     "id": str(node_id),
                     "label": str(label),
@@ -480,10 +497,10 @@ class Neo4jClient:
                     "properties": serialized_props,
                 })
 
-            raw_edges = self.run_query(edge_query)
+            raw_edges = self.run_query(edge_query, params)
             for rec in raw_edges:
                 edge_props = rec.get("props", {})
-                serialized_edge_props = {k: serialize_prop(v) for k, v in edge_props.items()}
+                serialized_edge_props = {k: serialize_prop(val) for k, val in edge_props.items()}
                 edges.append({
                     "source": str(rec.get("sourceId")),
                     "target": str(rec.get("targetId")),

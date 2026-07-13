@@ -92,34 +92,15 @@ class WorkflowEngine:
         faiss_store: Any = None,
         risk_analyzer: Any = None,
         neo4j_client: Any = None,
+        owner: Optional[str] = None,
     ) -> WorkflowState:
-        """Start a new contract review workflow.
-
-        Creates the initial :class:`WorkflowState`, runs the automated
-        steps (ingest → embed → risk analysis), and pauses at the
-        human-approval gate.
-
-        Args:
-            contract_id: Unique identifier for the contract.
-            file_path:   Absolute path to the uploaded file on disk.
-            filename:    Original filename (used to detect file type).
-            vendor_name: Optional vendor name override.
-            contract_title: Optional contract title override.
-            renewal_date: Optional renewal date override.
-            embedder: Embedder service.
-            faiss_store: Vector store service.
-            risk_analyzer: AI analysis service.
-            neo4j_client: Neo4j graph client.
-
-        Returns:
-            The current :class:`WorkflowState` — may be
-            ``PAUSED_FOR_REVIEW``, ``FAILED``, or ``COMPLETED``.
-        """
+        """Start a new contract review workflow."""
         workflow = WorkflowState(
             contract_id=contract_id,
             status=WorkflowStatus.RUNNING,
             current_step=0,
             steps={name: StepStatus.QUEUED for name in STEP_NAMES},
+            owner=owner,
         )
 
         self._workflows[contract_id] = workflow

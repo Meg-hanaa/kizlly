@@ -295,6 +295,7 @@ class WorkflowState(BaseModel):
     contradictions: List[ContradictionFlag] = []
     review_decisions: List[ClauseReviewDecision] = []
     privacy_logs: List[PrivacyLog] = []
+    owner: Optional[str] = None
     error: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

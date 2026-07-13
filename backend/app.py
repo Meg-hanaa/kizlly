@@ -466,6 +466,7 @@ async def _run_workflow(
             faiss_store=get_faiss_store(),
             risk_analyzer=get_risk_analyzer(),
             neo4j_client=get_neo4j_client(),
+            owner=reviewer.get("username") if reviewer else None,
         )
     except Exception as e:
         print(f"[ERROR] Workflow failed for {contract_id}: {e}")
@@ -481,10 +482,12 @@ async def _run_workflow(
 
 @app.get("/api/contracts")
 async def api_list_contracts(user: dict = Depends(get_current_user)):
-    """List all contracts and their workflow status."""
+    """List all contracts belonging to the current user."""
     engine = get_workflow_engine()
     workflows = engine.list_workflows()
-    return {"contracts": workflows}
+    username = user.get("username")
+    filtered = [w for w in workflows if w.owner == username]
+    return {"contracts": filtered}
 
 
 @app.get("/api/contracts/{contract_id}/status")
@@ -494,6 +497,8 @@ async def api_contract_status(contract_id: str, user: dict = Depends(get_current
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
     return workflow
 
 
@@ -504,6 +509,8 @@ async def api_contract_clauses(contract_id: str, user: dict = Depends(get_curren
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
     return {
         "contract_id": contract_id,
         "status": workflow.status,
@@ -525,6 +532,8 @@ async def api_submit_review(
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
 
     if workflow.status != WorkflowStatus.PAUSED_FOR_REVIEW:
         raise HTTPException(400, "Contract is not awaiting review")
@@ -580,15 +589,15 @@ async def api_portfolio_dashboard(user: dict = Depends(get_current_user)):
     neo4j = get_neo4j_client()
     if not neo4j:
         # Return demo data if Neo4j not configured
-        return _demo_dashboard()
+        return _demo_dashboard(owner=user.get("username"))
 
     try:
         from graph.queries import get_portfolio_stats
-        stats = get_portfolio_stats(neo4j)
+        stats = get_portfolio_stats(neo4j, owner=user.get("username"))
         return stats
     except Exception as e:
         print(f"[WARN] Dashboard query failed: {e}")
-        return _demo_dashboard()
+        return _demo_dashboard(owner=user.get("username"))
 
 
 @app.get("/api/portfolio/graph")
@@ -599,7 +608,7 @@ async def api_graph_data(user: dict = Depends(get_current_user)):
         return {"nodes": [], "edges": []}
 
     try:
-        data = neo4j.get_graph_data()
+        data = neo4j.get_graph_data(owner=user.get("username"))
         return data
     except Exception as e:
         print(f"[WARN] Graph query failed: {e}")
@@ -615,7 +624,7 @@ async def api_vendor_exposure(user: dict = Depends(get_current_user)):
 
     try:
         from graph.queries import get_vendor_exposure
-        return {"vendors": get_vendor_exposure(neo4j)}
+        return {"vendors": get_vendor_exposure(neo4j, owner=user.get("username"))}
     except Exception as e:
         print(f"[WARN] Vendor exposure query failed: {e}")
         return {"vendors": []}
@@ -633,7 +642,7 @@ async def api_renewal_risk(
 
     try:
         from graph.queries import get_renewal_risk
-        return {"renewals": get_renewal_risk(neo4j, days)}
+        return {"renewals": get_renewal_risk(neo4j, days, owner=user.get("username"))}
     except Exception as e:
         print(f"[WARN] Renewal risk query failed: {e}")
         return {"renewals": []}
@@ -805,11 +814,12 @@ async def api_privacy_log(
 # DEMO DATA (used when Neo4j is not configured)
 # ---------------------------------------------------------------------------
 
-def _demo_dashboard():
+def _demo_dashboard(owner: Optional[str] = None):
     """Return real dashboard stats from local workflow files when Neo4j is not available."""
     engine = get_workflow_engine()
-    # list_workflows() returns WorkflowState Pydantic objects
     workflows = engine.list_workflows()
+    if owner:
+        workflows = [w for w in workflows if w.owner == owner]
 
     total_contracts = len(workflows)
     vendors = set()
@@ -819,7 +829,6 @@ def _demo_dashboard():
     risk_dist = {}
 
     for w in workflows:
-        # WorkflowState is a Pydantic model — use attribute access, not .get()
         meta = w.contract_meta
         if meta and meta.vendor_name:
             vendors.add(meta.vendor_name)

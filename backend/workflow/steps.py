@@ -444,6 +444,7 @@ def step_graph_write(
                 status=meta.status.value if meta.status else "Active",
                 renewal_date=getattr(meta, "renewal_date", None),
                 notice_deadline=getattr(meta, "notice_deadline", None),
+                owner=workflow.owner,
             )
             
             # Create RENEWS_ON relationship if renewal_date is present
