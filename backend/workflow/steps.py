@@ -67,7 +67,8 @@ def step_ingest(
 
     if ext == ".pdf":
         from ingestion.pdf_parser import parse_pdf
-        text = parse_pdf(file_path)
+        pdf_res = parse_pdf(file_path)
+        text = pdf_res.get("text", "")
     elif ext in (".docx", ".doc"):
         from ingestion.docx_parser import parse_docx
         text = parse_docx(file_path)
@@ -140,6 +141,7 @@ def step_ingest(
         title=contract_title or filename.rsplit(".", 1)[0],
         vendor_name=vendor_name or "Unknown Vendor",
         total_chars=len(text),
+        total_pages=pdf_res.get("pages", 1) if ext == ".pdf" else 1,
         renewal_date=final_renewal_date,
         notice_deadline=final_notice_deadline,
         auto_renewal=auto_renewal,
@@ -203,7 +205,7 @@ def step_embed_and_search(
     if embedder is not None and faiss_store is not None:
         try:
             texts = [c.text for c in clause_chunks]
-            vectors = embedder.encode(texts)
+            vectors = embedder.embed(texts)
             faiss_store.add(
                 vectors,
                 [{"id": c.id, "text": c.text} for c in clause_chunks],
@@ -273,26 +275,22 @@ def step_risk_analysis(
             truncated += "."
 
         try:
-            analysis = risk_analyzer.analyze(truncated)
+            analysis = risk_analyzer.analyze_clause(truncated)
 
             if analysis and isinstance(analysis, dict):
-                flags = analysis.get("flags", [])
-                for flag_data in flags:
+                # analyze_clause returns single dict with keys: risk_type, category, severity, explanation, confidence
+                if analysis.get("risk_type") not in ("None", "Analysis Error", "Parse Error", None):
                     risk_flags.append(
                         RiskFlag(
                             clause_id=chunk.id,
                             clause_text=chunk.text,
-                            risk_type=flag_data.get("risk_type", "Unknown"),
-                            category=flag_data.get("category", "Other"),
-                            severity=flag_data.get("severity", "Medium"),
-                            explanation=flag_data.get("explanation", ""),
-                            ai_confidence=flag_data.get("confidence", 0.0),
+                            risk_type=analysis.get("risk_type", "Unknown"),
+                            category=analysis.get("category", "Other"),
+                            severity=analysis.get("severity", "Medium"),
+                            explanation=analysis.get("explanation", ""),
+                            ai_confidence=analysis.get("confidence", 0.5),
                         )
                     )
-
-                # Record contradictions
-                contradictions = analysis.get("contradictions", [])
-                workflow.contradictions.extend(contradictions)
 
             chunks_sent.append(truncated[:50])
             total_chars_sent += len(truncated)
@@ -303,6 +301,31 @@ def step_risk_analysis(
             )
 
     workflow.risk_flags = risk_flags
+
+    # Contradiction detection on adjacent chunks
+    contradictions = []
+    if len(workflow.chunks) > 1:
+        logger.info("[risk_analysis] Checking %d adjacent pairs for contradictions...", len(workflow.chunks) - 1)
+        for i in range(len(workflow.chunks) - 1):
+            a = workflow.chunks[i]
+            b = workflow.chunks[i + 1]
+            try:
+                res = risk_analyzer.detect_contradiction(a.text, b.text)
+                if res.get("contradicts"):
+                    from models import ContradictionFlag
+                    contradictions.append(
+                        ContradictionFlag(
+                            clause_a_id=a.id,
+                            clause_a_text=a.text,
+                            clause_b_id=b.id,
+                            clause_b_text=b.text,
+                            explanation=res.get("explanation", "Contradictory terms detected."),
+                            severity=res.get("severity", "High")
+                        )
+                    )
+            except Exception as e:
+                logger.warning("[risk_analysis] Contradiction check failed for pair %d: %s", i, e)
+    workflow.contradictions = contradictions
 
     # Privacy log: what was sent to Groq
     if chunks_sent:

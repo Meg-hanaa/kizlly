@@ -219,6 +219,14 @@ class Neo4jClient:
         CREATE (v)-[:APPEARS_IN]->(c)
         RETURN c.id AS contractId, v.name AS vendor
         """
+        clean_renewal = renewal_date.split("T")[0] if (renewal_date and "T" in renewal_date) else renewal_date
+        if clean_renewal:
+            clean_renewal = clean_renewal[:10]
+            
+        clean_notice = notice_deadline.split("T")[0] if (notice_deadline and "T" in notice_deadline) else notice_deadline
+        if clean_notice:
+            clean_notice = clean_notice[:10]
+
         return self.run_query(query, {
             "contract_id": contract_id,
             "title": title,
@@ -227,8 +235,8 @@ class Neo4jClient:
             "expiration_date": expiration_date,
             "value": value,
             "status": status,
-            "renewal_date": renewal_date,
-            "notice_deadline": notice_deadline,
+            "renewal_date": clean_renewal,
+            "notice_deadline": clean_notice,
         })
 
     # ------------------------------------------------------------------ #
@@ -321,24 +329,20 @@ class Neo4jClient:
         contract_id: str,
         renewal_date: str,
     ) -> List[Dict[str, Any]]:
-        """MERGE a Date node and create a RENEWS_ON relationship.
-
-        Args:
-            contract_id:  Contract to set the renewal for.
-            renewal_date: ISO date string (YYYY-MM-DD).
-
-        Returns:
-            Query result records.
-        """
+        """MERGE a Date node and create a RENEWS_ON relationship."""
+        # Truncate 'YYYY-MM-DDTHH:MM' or similar to 'YYYY-MM-DD' for date() compatibility
+        short_date = renewal_date.split("T")[0] if "T" in renewal_date else renewal_date
+        short_date = short_date[:10]
+        
         query = """
         MATCH (c:Contract {id: $contract_id})
-        MERGE (d:Date {date: $renewal_date})
+        MERGE (d:Date {date: $short_date})
         MERGE (c)-[:RENEWS_ON]->(d)
         RETURN c.id AS contractId, d.date AS renewalDate
         """
         return self.run_query(query, {
             "contract_id": contract_id,
-            "renewal_date": renewal_date,
+            "short_date": short_date,
         })
 
     def create_alert(

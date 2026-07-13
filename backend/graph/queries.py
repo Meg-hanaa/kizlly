@@ -28,12 +28,12 @@ def get_vendor_exposure(client: "Neo4jClient") -> List[Dict[str, Any]]:
         ``totalExposure``.
     """
     query = """
-    MATCH (v:Vendor)-[:APPEARS_IN]->(c:Contract)
-    WHERE c.status = 'Active'
+    MATCH (c:Contract)-[:WITH_VENDOR]->(v:Vendor)
+    WHERE c.status = 'Active' OR c.status = 'completed'
     RETURN
-        v.name         AS vendor,
-        count(c)       AS contractCount,
-        sum(c.value)   AS totalExposure
+         v.name        AS vendor,
+         count(c)      AS contractCount,
+         sum(c.value)  AS totalExposure
     ORDER BY totalExposure DESC
     LIMIT 20
     """
@@ -144,8 +144,8 @@ def get_portfolio_stats(client: "Neo4jClient") -> Dict[str, Any]:
 
     # Active vendors
     rows = client.run_query(
-        "MATCH (v:Vendor)-[:APPEARS_IN]->(c:Contract) "
-        "WHERE c.status = 'Active' "
+        "MATCH (c:Contract)-[:WITH_VENDOR]->(v:Vendor) "
+        "WHERE c.status = 'Active' OR c.status = 'completed' "
         "RETURN count(DISTINCT v) AS cnt"
     )
     if rows:
