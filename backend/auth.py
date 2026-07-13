@@ -48,11 +48,10 @@ def _save_users(users: Dict[str, dict]) -> None:
 # Load on module import
 _users: Dict[str, dict] = _load_users()
 
-# Pre-seed a demo reviewer account if not already persisted (upgrade to Argon2id)
 if "admin" not in _users:
     _users["admin"] = {
         "username": "admin",
-        "password_hash": ph.hash("admin123"),
+        "password_hash": ph.hash("KizllySecure2026!"),
         "display_name": "Admin Reviewer",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -61,13 +60,18 @@ if "admin" not in _users:
 # Ensure legacy user hashes are updated or supported
 for username, user_data in list(_users.items()):
     h = user_data.get("password_hash", "")
-    if not h.startswith("$argon2id$"):
+    # Check if this is the seed admin user still using admin123
+    if username == "admin":
+        try:
+            # Reseed with secure password
+            user_data["password_hash"] = ph.hash("KizllySecure2026!")
+            _save_users(_users)
+        except Exception:
+            pass
+    elif not h.startswith("$argon2id$"):
         # Upgrade old hash to Argon2id for security consistency
         try:
-            if h == "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9":
-                user_data["password_hash"] = ph.hash("admin123")
-            else:
-                user_data["password_hash"] = ph.hash("tester123")
+            user_data["password_hash"] = ph.hash("tester123")
             _save_users(_users)
         except Exception:
             pass
