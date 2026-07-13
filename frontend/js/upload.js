@@ -36,29 +36,38 @@ const UploadView = {
                 <div class="card p-lg">
                     <h3 style="margin-top:0;">Upload Contract</h3>
                     <form id="upload-form">
+                        <!-- Drag and Drop Upload Box -->
                         <div class="form-group">
-                            <label for="file-input">Contract Document (PDF, DOCX, TXT) *</label>
-                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: block; width: 100%; border: 2px solid var(--border-color); padding: 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); cursor: pointer;" />
+                            <label for="file-input" style="font-weight: 600; display: block; margin-bottom: 8px;">Contract Document (PDF, DOCX, TXT) *</label>
+                            <div id="drop-zone" style="border: 2px dashed var(--border-color); padding: 30px; border-radius: var(--radius-sm); text-align: center; background: var(--bg-secondary); cursor: pointer; transition: border-color 0.2s, background-color 0.2s;">
+                                <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📁</span>
+                                <span style="font-weight: 600; color: var(--text-primary);">Drag & Drop File Here</span>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-top: 4px;">or click to browse local files</span>
+                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: none;" />
+                            </div>
+                            <div id="file-name-preview" style="font-size: 0.85rem; color: var(--accent-teal); font-weight: 600; margin-top: 8px; display: none;"></div>
                         </div>
+                        
                         <div class="form-group">
-                            <label for="vendor-name">Counterparty / Vendor Name (Optional)</label>
-                            <input type="text" id="vendor-name" placeholder="Leave empty for auto-extraction (e.g. Acme Corp)" />
+                            <label for="vendor-name">Counterparty / Vendor Name</label>
+                            <input type="text" id="vendor-name" placeholder="Leave blank to read directly from document (e.g., Acme Corp)" />
                         </div>
 
                         <div class="form-group">
-                            <label for="contract-title">Contract Title / Reference (Optional)</label>
-                            <input type="text" id="contract-title" placeholder="Leave empty for auto-extraction (e.g. MSA 2026)" />
+                            <label for="contract-title">Contract Title / Reference</label>
+                            <input type="text" id="contract-title" placeholder="Leave blank to read directly from document (e.g., MSA 2026)" />
                         </div>
+                        
                         <div class="form-group">
                             <label for="renewal-date">Target Renewal Date</label>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <input type="datetime-local" id="renewal-date" style="flex-grow: 1;" />
+                                <input type="datetime-local" id="renewal-date" style="flex-grow: 1;" placeholder="Leave blank to read directly from document" />
                                 <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
                             </div>
-                            <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Select a calendar date, or click the button to set the renewal to 3 minutes in the future for testing.</span>
+                            <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Leave blank to extract automatically from the document, select a date, or set to 3 minutes in the future for testing.</span>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width:100%;"> Start Intelligence Pipeline</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 10px;"> Start Ingestion Pipeline</button>
                     </form>
                 </div>
                 <!-- Active Pipelines List -->
@@ -78,6 +87,53 @@ const UploadView = {
     setupUploadHandlers() {
         const fileInput = document.getElementById('file-input');
         const uploadForm = document.getElementById('upload-form');
+        const dropZone = document.getElementById('drop-zone');
+        const filePreview = document.getElementById('file-name-preview');
+
+        if (dropZone && fileInput) {
+            // Click trigger
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            // Drag effects
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--accent-teal)';
+                dropZone.style.backgroundColor = 'rgba(6, 182, 212, 0.05)';
+            });
+
+            ['dragleave', 'dragend'].forEach(type => {
+                dropZone.addEventListener(type, () => {
+                    dropZone.style.borderColor = 'var(--border-color)';
+                    dropZone.style.backgroundColor = 'var(--bg-secondary)';
+                });
+            });
+
+            // Handle drop
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--border-color)';
+                dropZone.style.backgroundColor = 'var(--bg-secondary)';
+
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    updateFilePreview(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Handle standard browse selection
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) {
+                    updateFilePreview(fileInput.files[0]);
+                }
+            });
+
+            const updateFilePreview = (file) => {
+                if (filePreview) {
+                    filePreview.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    filePreview.style.display = 'block';
+                }
+            };
+        }
 
         // Demo date generator
         const setDemoBtn = document.getElementById('set-demo-date-btn');
@@ -119,6 +175,10 @@ const UploadView = {
                     
                     // Reset upload state
                     uploadForm.reset();
+                    if (filePreview) {
+                        filePreview.style.display = 'none';
+                        filePreview.textContent = '';
+                    }
                     
                     await this.loadActivePipelines();
                 } catch (err) {
