@@ -35,28 +35,20 @@ logger = logging.getLogger(__name__)
 def step_ingest(
     workflow: WorkflowState,
     file_path: str,
-<<<<<<< HEAD
-) -> WorkflowState:
-    """Parse an uploaded contract and extract raw text.
-=======
     vendor_name: Optional[str] = None,
     contract_title: Optional[str] = None,
     renewal_date: Optional[str] = None,
 ) -> WorkflowState:
     """Parse an uploaded contract and extract raw text and metadata.
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Chooses the parser based on file extension (``.pdf`` or ``.docx``).
 
     Args:
         workflow:  Current workflow state.
         file_path: Absolute path to the uploaded file.
-<<<<<<< HEAD
-=======
         vendor_name: Counterparty name.
         contract_title: Title of the contract.
         renewal_date: Target renewal date (optional manual override).
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Returns:
         Updated :class:`WorkflowState` with ``extracted_text`` and
@@ -75,23 +67,11 @@ def step_ingest(
 
     if ext == ".pdf":
         from ingestion.pdf_parser import parse_pdf
-        text = parse_pdf(file_path)
+        pdf_res = parse_pdf(file_path)
+        text = pdf_res.get("text", "")
     elif ext in (".docx", ".doc"):
         from ingestion.docx_parser import parse_docx
         text = parse_docx(file_path)
-<<<<<<< HEAD
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
-
-    # Build contract metadata
-    filename = os.path.basename(file_path)
-    workflow.extracted_text = text
-    workflow.contract_meta = ContractMetadata(
-        id=workflow.contract_id,
-        filename=filename,
-        title=filename.rsplit(".", 1)[0],
-        total_chars=len(text),
-=======
     elif ext == ".txt":
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read()
@@ -102,6 +82,8 @@ def step_ingest(
     extracted_renewal_date = None
     extracted_notice_deadline = None
     auto_renewal = None
+    extracted_vendor = None
+    extracted_title = None
 
     try:
         from llm.groq_client import GroqClient
@@ -112,11 +94,15 @@ def step_ingest(
             "Analyze the contract text to extract:\n"
             "1. The next renewal or expiration date.\n"
             "2. Whether there is an auto-renewal clause.\n"
-            "3. The notice-period deadline (when notice of non-renewal must be given, e.g. if renewal is 2026-12-31 and notice is 30 days prior, the notice deadline is 2026-12-01).\n\n"
+            "3. The notice-period deadline (when notice of non-renewal must be given, e.g. if renewal is 2026-12-31 and notice is 30 days prior, the notice deadline is 2026-12-01).\n"
+            "4. The contract title or document name (e.g. Master Services Agreement, Lease Contract).\n"
+            "5. The vendor name or the counterparty performing services in this agreement.\n\n"
             "Format dates as YYYY-MM-DD. Return a JSON object with keys:\n"
             '- "renewal_date": "YYYY-MM-DD" or null\n'
             '- "auto_renewal": true/false or null\n'
-            '- "notice_deadline": "YYYY-MM-DD" or null\n\n'
+            '- "notice_deadline": "YYYY-MM-DD" or null\n'
+            '- "contract_title": "String" or null\n'
+            '- "vendor_name": "String" or null\n\n'
             "Return ONLY valid JSON, no markdown fences or extra text."
         )
         response_raw = groq.chat(system_prompt=system_prompt, user_prompt=snippet)
@@ -127,10 +113,12 @@ def step_ingest(
         extracted_renewal_date = extracted_data.get("renewal_date")
         extracted_notice_deadline = extracted_data.get("notice_deadline")
         auto_renewal = extracted_data.get("auto_renewal")
+        extracted_vendor = extracted_data.get("vendor_name")
+        extracted_title = extracted_data.get("contract_title")
 
         logger.info(
-            "[ingest] Extracted dates: renewal_date=%s, notice_deadline=%s, auto_renewal=%s",
-            extracted_renewal_date, extracted_notice_deadline, auto_renewal
+            "[ingest] Extracted details: renewal_date=%s, notice_deadline=%s, auto_renewal=%s, vendor=%s, title=%s",
+            extracted_renewal_date, extracted_notice_deadline, auto_renewal, extracted_vendor, extracted_title
         )
 
         # Log outbound data for privacy transparency
@@ -154,17 +142,19 @@ def step_ingest(
     
     final_renewal_date = renewal_date or extracted_renewal_date
     final_notice_deadline = extracted_notice_deadline
+    final_title = contract_title or extracted_title or filename.rsplit(".", 1)[0]
+    final_vendor = vendor_name or extracted_vendor or "Unknown Vendor"
 
     workflow.contract_meta = ContractMetadata(
         id=workflow.contract_id,
         filename=filename,
-        title=contract_title or filename.rsplit(".", 1)[0],
-        vendor_name=vendor_name or "Unknown Vendor",
+        title=final_title,
+        vendor_name=final_vendor,
         total_chars=len(text),
+        total_pages=pdf_res.get("pages", 1) if ext == ".pdf" else 1,
         renewal_date=final_renewal_date,
         notice_deadline=final_notice_deadline,
         auto_renewal=auto_renewal,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     )
     workflow.updated_at = datetime.now(timezone.utc)
 
@@ -225,7 +215,7 @@ def step_embed_and_search(
     if embedder is not None and faiss_store is not None:
         try:
             texts = [c.text for c in clause_chunks]
-            vectors = embedder.encode(texts)
+            vectors = embedder.embed(texts)
             faiss_store.add(
                 vectors,
                 [{"id": c.id, "text": c.text} for c in clause_chunks],
@@ -295,26 +285,22 @@ def step_risk_analysis(
             truncated += "."
 
         try:
-            analysis = risk_analyzer.analyze(truncated)
+            analysis = risk_analyzer.analyze_clause(truncated)
 
             if analysis and isinstance(analysis, dict):
-                flags = analysis.get("flags", [])
-                for flag_data in flags:
+                # analyze_clause returns single dict with keys: risk_type, category, severity, explanation, confidence
+                if analysis.get("risk_type") not in ("None", "Analysis Error", "Parse Error", None):
                     risk_flags.append(
                         RiskFlag(
                             clause_id=chunk.id,
                             clause_text=chunk.text,
-                            risk_type=flag_data.get("risk_type", "Unknown"),
-                            category=flag_data.get("category", "Other"),
-                            severity=flag_data.get("severity", "Medium"),
-                            explanation=flag_data.get("explanation", ""),
-                            ai_confidence=flag_data.get("confidence", 0.0),
+                            risk_type=analysis.get("risk_type", "Unknown"),
+                            category=analysis.get("category", "Other"),
+                            severity=analysis.get("severity", "Medium"),
+                            explanation=analysis.get("explanation", ""),
+                            ai_confidence=analysis.get("confidence", 0.5),
                         )
                     )
-
-                # Record contradictions
-                contradictions = analysis.get("contradictions", [])
-                workflow.contradictions.extend(contradictions)
 
             chunks_sent.append(truncated[:50])
             total_chars_sent += len(truncated)
@@ -325,6 +311,31 @@ def step_risk_analysis(
             )
 
     workflow.risk_flags = risk_flags
+
+    # Contradiction detection on adjacent chunks
+    contradictions = []
+    if len(workflow.chunks) > 1:
+        logger.info("[risk_analysis] Checking %d adjacent pairs for contradictions...", len(workflow.chunks) - 1)
+        for i in range(len(workflow.chunks) - 1):
+            a = workflow.chunks[i]
+            b = workflow.chunks[i + 1]
+            try:
+                res = risk_analyzer.detect_contradiction(a.text, b.text)
+                if res.get("contradicts"):
+                    from models import ContradictionFlag
+                    contradictions.append(
+                        ContradictionFlag(
+                            clause_a_id=a.id,
+                            clause_a_text=a.text,
+                            clause_b_id=b.id,
+                            clause_b_text=b.text,
+                            explanation=res.get("explanation", "Contradictory terms detected."),
+                            severity=res.get("severity", "High")
+                        )
+                    )
+            except Exception as e:
+                logger.warning("[risk_analysis] Contradiction check failed for pair %d: %s", i, e)
+    workflow.contradictions = contradictions
 
     # Privacy log: what was sent to Groq
     if chunks_sent:
@@ -431,11 +442,9 @@ def step_graph_write(
                 expiration_date=None,
                 value=0.0,
                 status=meta.status.value if meta.status else "Active",
-<<<<<<< HEAD
-            )
-=======
                 renewal_date=getattr(meta, "renewal_date", None),
                 notice_deadline=getattr(meta, "notice_deadline", None),
+                owner=workflow.owner,
             )
             
             # Create RENEWS_ON relationship if renewal_date is present
@@ -445,7 +454,6 @@ def step_graph_write(
                     neo4j_client.set_renewal_date(meta.id, renewal_date_val)
                 except Exception as ex:
                     logger.warning("[graph_write] Failed to set renewal date relationship: %s", ex)
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         # Create clause + risk nodes for approved clauses only
         for risk_flag in workflow.risk_flags:

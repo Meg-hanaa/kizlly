@@ -1,26 +1,49 @@
-FROM python:3.11-slim
+# Production Dockerfile for Kizlly
+# Multi-stage build to minimize image size
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Stage 1: Build & Cache python requirements
+FROM python:3.11-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements first for Docker cache
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Copy backend and frontend
-COPY backend/ /app/backend/
-COPY frontend/ /app/frontend/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create data directories
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Final Run environment
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    DEBUG=false \
+    PYTHONPATH=/app/backend
+
+# Copy cached python library dependencies from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy backend files and static frontend files
+COPY backend/ ./backend/
+COPY frontend/ ./frontend/
+
+# Create persistent data directories
 RUN mkdir -p /app/backend/data/uploads /app/backend/data/faiss_index
 
-# Expose port (Render uses PORT env var)
-EXPOSE 10000
+EXPOSE 8000
 
-# Start the server
-CMD cd /app/backend && uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000}
+# Health check check-in configuration
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Start Kizlly via Gunicorn/Uvicorn runner
+CMD ["python", "backend/app.py"]

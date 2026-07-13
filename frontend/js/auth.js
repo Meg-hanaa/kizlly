@@ -18,6 +18,30 @@ const AuthManager = {
             } catch (e) {
                 this.logout();
             }
+        } else {
+            // Check if guest token already exists
+            const guestToken = localStorage.getItem('kizlly_guest_token');
+            if (guestToken) {
+                this.token = guestToken;
+                this.currentUser = {
+                    username: localStorage.getItem('kizlly_guest_username') || 'guest',
+                    display_name: 'Guest Reviewer'
+                };
+                this.isAuthenticated = false;
+            } else {
+                // Generate a temporary persistent guest token for guest mode
+                const randomId = Math.random().toString(36).substring(2, 9);
+                const guestUser = 'guest_' + randomId;
+                const tempToken = 'guest_token_' + randomId;
+                localStorage.setItem('kizlly_guest_token', tempToken);
+                localStorage.setItem('kizlly_guest_username', guestUser);
+                this.token = tempToken;
+                this.currentUser = {
+                    username: guestUser,
+                    display_name: 'Guest Reviewer'
+                };
+                this.isAuthenticated = false;
+            }
         }
         this.updateNavbar();
     },
@@ -122,20 +146,38 @@ const AuthManager = {
             display_name: response.display_name
         };
         this.isAuthenticated = true;
+        
+        // Remove guest sessions to ensure the regular token is exclusively used
+        localStorage.removeItem('kizlly_guest_token');
+        localStorage.removeItem('kizlly_guest_username');
+        
         localStorage.setItem('kizlly_token', this.token);
         localStorage.setItem('kizlly_user', JSON.stringify(this.currentUser));
         this.updateNavbar();
+        // Restart alert polling now that user is authenticated
+        if (typeof AlertManager !== 'undefined') {
+            AlertManager.init();
+        }
     },
 
     updateNavbar() {
         const navbarUser = document.getElementById('navbarUser');
         if (!navbarUser) return;
 
-        if (this.isAuthenticated && this.currentUser) {
+        const isGuest = this.currentUser && this.currentUser.username.startsWith('guest_');
+
+        if (this.isAuthenticated && this.currentUser && !isGuest) {
             navbarUser.innerHTML = `
                 <div class="user-profile" style="display:flex; align-items:center; gap:12px;">
                     <span id="username-display" style="font-size:0.9rem; font-weight:500;">${this.currentUser.display_name}</span>
                     <button class="btn btn-outline btn-sm" id="logoutBtn" onclick="AuthManager.logout()">Sign Out</button>
+                </div>
+            `;
+        } else if (isGuest) {
+            navbarUser.innerHTML = `
+                <div class="user-profile" style="display:flex; align-items:center; gap:12px;">
+                    <span id="username-display" style="font-size:0.9rem; font-weight:500; opacity:0.8; font-style:italic;">Guest Mode</span>
+                    <button class="btn btn-outline btn-sm" id="loginBtn" onclick="AuthManager.showLoginModal()">Sign In</button>
                 </div>
             `;
         } else {
@@ -153,17 +195,21 @@ const AuthManager = {
         this.isAuthenticated = false;
         localStorage.removeItem('kizlly_token');
         localStorage.removeItem('kizlly_user');
+        localStorage.removeItem('kizlly_guest_token');
+        localStorage.removeItem('kizlly_guest_username');
         this.updateNavbar();
+        // Stop alert polling so we don't flood 401 errors
+        if (typeof AlertManager !== 'undefined' && AlertManager.pollInterval) {
+            clearInterval(AlertManager.pollInterval);
+            AlertManager.pollInterval = null;
+        }
         App.showToast('Logged out successfully.', 'info');
-        window.location.hash = '#/upload';
-        this.showLoginModal();
+        // Restart in guest mode by re-running init
+        this.init();
+        window.location.hash = '#/home';
     },
 
     requireAuth() {
-        if (!this.isAuthenticated) {
-            this.showLoginModal();
-            return false;
-        }
         return true;
     }
 };

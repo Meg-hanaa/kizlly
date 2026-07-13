@@ -8,7 +8,7 @@ ready for the API layer. All queries are read-only.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from graph.neo4j_client import Neo4jClient
@@ -20,24 +20,25 @@ logger = logging.getLogger(__name__)
 # Vendor exposure
 # ------------------------------------------------------------------ #
 
-def get_vendor_exposure(client: "Neo4jClient") -> List[Dict[str, Any]]:
-    """Return top-20 vendors by total active-contract exposure.
+def get_vendor_exposure(client: "Neo4jClient", owner: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return top-20 vendors by total active-contract exposure for an owner."""
+    active_where = "c.status = 'Active' OR c.status = 'completed'"
+    params = {}
+    if owner:
+        active_where = f"({active_where}) AND c.owner = $owner"
+        params["owner"] = owner
 
-    Returns:
-        A list of dicts with keys ``vendor``, ``contractCount``,
-        ``totalExposure``.
-    """
-    query = """
-    MATCH (v:Vendor)-[:APPEARS_IN]->(c:Contract)
-    WHERE c.status = 'Active'
+    query = f"""
+    MATCH (c:Contract)-[:WITH_VENDOR]->(v:Vendor)
+    WHERE {active_where}
     RETURN
-        v.name         AS vendor,
-        count(c)       AS contractCount,
-        sum(c.value)   AS totalExposure
+         v.name        AS vendor,
+         count(c)      AS contractCount,
+         sum(c.value)  AS totalExposure
     ORDER BY totalExposure DESC
     LIMIT 20
     """
-    return client.run_query(query)
+    return client.run_query(query, params)
 
 
 # ------------------------------------------------------------------ #
@@ -47,39 +48,36 @@ def get_vendor_exposure(client: "Neo4jClient") -> List[Dict[str, Any]]:
 def get_renewal_risk(
     client: "Neo4jClient",
     days: int = 90,
+    owner: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Find contracts renewing within *days* and categorise urgency.
+    """Find contracts renewing within *days* for an owner and categorise urgency."""
+    where_clauses = ["daysUntil >= 0", "daysUntil <= $days"]
+    params = {"days": days}
+    if owner:
+        where_clauses.append("c.owner = $owner")
+        params["owner"] = owner
 
-    Urgency buckets:
-    - **URGENT** — within 30 days
-    - **SOON** — 31-60 days
-    - **UPCOMING** — 61-90 days  (or up to *days*)
-
-    Returns:
-        A list of dicts with keys ``contractId``, ``title``, ``vendor``,
-        ``renewalDate``, ``value``, ``urgency``, ``daysUntil``.
-    """
-    query = """
+    query = f"""
     MATCH (c:Contract)-[:RENEWS_ON]->(d:Date)
     MATCH (c)-[:WITH_VENDOR]->(v:Vendor)
     WITH c, v, d,
          duration.inDays(date(), date(d.date)).days AS daysUntil
-    WHERE daysUntil >= 0 AND daysUntil <= $days
+    WHERE {' AND '.join(where_clauses)}
     RETURN
-        c.id        AS contractId,
-        c.title     AS title,
-        v.name      AS vendor,
-        d.date      AS renewalDate,
-        c.value     AS value,
-        daysUntil,
-        CASE
-            WHEN daysUntil <= 30 THEN 'URGENT'
-            WHEN daysUntil <= 60 THEN 'SOON'
-            ELSE 'UPCOMING'
-        END AS urgency
+         c.id        AS contractId,
+         c.title     AS title,
+         v.name      AS vendor,
+         d.date      AS renewalDate,
+         c.value     AS value,
+         daysUntil,
+         CASE
+             WHEN daysUntil <= 30 THEN 'URGENT'
+             WHEN daysUntil <= 60 THEN 'SOON'
+             ELSE 'UPCOMING'
+         END AS urgency
     ORDER BY daysUntil ASC
     """
-    return client.run_query(query, {"days": days})
+    return client.run_query(query, params)
 
 
 # ------------------------------------------------------------------ #
@@ -123,13 +121,8 @@ def get_clause_patterns(client: "Neo4jClient") -> List[Dict[str, Any]]:
 # Portfolio statistics
 # ------------------------------------------------------------------ #
 
-def get_portfolio_stats(client: "Neo4jClient") -> Dict[str, Any]:
-    """Return high-level portfolio statistics.
-
-    Returns:
-        A dict with ``total_contracts``, ``active_vendors``,
-        ``flagged_clauses``, and ``risk_distribution``.
-    """
+def get_portfolio_stats(client: "Neo4jClient", owner: Optional[str] = None) -> Dict[str, Any]:
+    """Return high-level portfolio statistics for a specific owner."""
     stats: Dict[str, Any] = {
         "total_contracts": 0,
         "active_vendors": 0,
@@ -137,33 +130,56 @@ def get_portfolio_stats(client: "Neo4jClient") -> Dict[str, Any]:
         "risk_distribution": {},
     }
 
+    # Match contract filter parameters
+    match_clause = "MATCH (c:Contract)"
+    where_clauses = []
+    params = {}
+    if owner:
+        where_clauses.append("c.owner = $owner")
+        params["owner"] = owner
+
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
     # Total contracts
-    rows = client.run_query("MATCH (c:Contract) RETURN count(c) AS cnt")
+    rows = client.run_query(f"{match_clause} {where_str} RETURN count(c) AS cnt", params)
     if rows:
         stats["total_contracts"] = rows[0].get("cnt", 0)
 
     # Active vendors
+    active_where = "c.status = 'Active' OR c.status = 'completed'"
+    if owner:
+        active_where = f"({active_where}) AND c.owner = $owner"
+    
     rows = client.run_query(
-        "MATCH (v:Vendor)-[:APPEARS_IN]->(c:Contract) "
-        "WHERE c.status = 'Active' "
-        "RETURN count(DISTINCT v) AS cnt"
+        "MATCH (c:Contract)-[:WITH_VENDOR]->(v:Vendor) "
+        f"WHERE {active_where} "
+        "RETURN count(DISTINCT v) AS cnt",
+        params
     )
     if rows:
         stats["active_vendors"] = rows[0].get("cnt", 0)
 
     # Flagged clauses
+    clause_where = ""
+    if owner:
+        clause_where = "WHERE c.owner = $owner"
+    
     rows = client.run_query(
-        "MATCH (cl:Clause)-[:FLAGGED_AS]->(:RiskType) "
-        "RETURN count(DISTINCT cl) AS cnt"
+        "MATCH (c:Contract)-[:HAS_CLAUSE]->(cl:Clause)-[:FLAGGED_AS]->(:RiskType) "
+        f"{clause_where} "
+        "RETURN count(DISTINCT cl) AS cnt",
+        params
     )
     if rows:
         stats["flagged_clauses"] = rows[0].get("cnt", 0)
 
     # Risk distribution
     rows = client.run_query(
-        "MATCH (cl:Clause)-[:FLAGGED_AS]->(rt:RiskType) "
+        "MATCH (c:Contract)-[:HAS_CLAUSE]->(cl:Clause)-[:FLAGGED_AS]->(rt:RiskType) "
+        f"{clause_where} "
         "RETURN rt.name AS risk_type, count(cl) AS cnt "
-        "ORDER BY cnt DESC"
+        "ORDER BY cnt DESC",
+        params
     )
     stats["risk_distribution"] = {
         row["risk_type"]: row["cnt"] for row in rows

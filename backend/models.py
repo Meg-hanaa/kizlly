@@ -68,7 +68,7 @@ class StepStatus(str, Enum):
 
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=8)
     display_name: Optional[str] = None
 
 
@@ -156,12 +156,9 @@ class ContractMetadata(BaseModel):
     total_chunks: int = 0
     total_chars: int = 0
     language: str = "English"
-<<<<<<< HEAD
-=======
     renewal_date: Optional[str] = None
     notice_deadline: Optional[str] = None
     auto_renewal: Optional[bool] = None
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
 
 class ContractUploadResponse(BaseModel):
@@ -298,6 +295,7 @@ class WorkflowState(BaseModel):
     contradictions: List[ContradictionFlag] = []
     review_decisions: List[ClauseReviewDecision] = []
     privacy_logs: List[PrivacyLog] = []
+    owner: Optional[str] = None
     error: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

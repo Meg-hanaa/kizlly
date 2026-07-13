@@ -10,9 +10,10 @@ const API = {
     async request(method, path, body = null, isFormData = false) {
         const url = `${this.BASE_URL}${path}`;
         const headers = {};
-        const token = localStorage.getItem('kizlly_token');
-
-        if (token) {
+        const token = localStorage.getItem('kizlly_token') || localStorage.getItem('kizlly_guest_token');
+        // Authentication endpoints should not send bearer tokens
+        const isAuthRoute = path.includes('/api/auth/');
+        if (token && !isAuthRoute) {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
@@ -31,14 +32,31 @@ const API = {
 
             // Handle 401 — token expired or invalid
             if (response.status === 401) {
-                localStorage.removeItem('kizlly_token');
-                localStorage.removeItem('kizlly_user');
-                if (typeof AuthManager !== 'undefined') {
-                    AuthManager.isAuthenticated = false;
-                    AuthManager.updateNavbar();
-                    AuthManager.showLoginModal();
+                let errorMsg = 'Session expired. Please sign in again.';
+                try {
+                    const errData = await response.json();
+                    if (errData.detail) {
+                        errorMsg = errData.detail;
+                    }
+                } catch (_) {}
+
+                // Only clear session and redirect if this is NOT an auth attempt
+                if (!path.includes('/api/auth/')) {
+                    localStorage.removeItem('kizlly_token');
+                    localStorage.removeItem('kizlly_user');
+                    if (typeof AuthManager !== 'undefined') {
+                        AuthManager.isAuthenticated = false;
+                        AuthManager.updateNavbar();
+                        
+                        // Guest-Session validation: Only show login modal if we had a token that expired,
+                        // do not show it automatically for guest-mode background polling
+                        const isGuestToken = token && token.startsWith('guest_token_');
+                        if (!isGuestToken) {
+                            AuthManager.showLoginModal();
+                        }
+                    }
                 }
-                throw new Error('Session expired. Please sign in again.');
+                throw new Error(errorMsg);
             }
 
             // Handle non-OK responses
@@ -46,7 +64,18 @@ const API = {
                 let errorMsg = `Request failed (${response.status})`;
                 try {
                     const errData = await response.json();
-                    errorMsg = errData.detail || errData.message || errData.error || errorMsg;
+                    let detail = errData.detail || errData.message || errData.error;
+                    if (detail) {
+                        if (typeof detail === 'object') {
+                            if (Array.isArray(detail)) {
+                                errorMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                            } else {
+                                errorMsg = detail.msg || JSON.stringify(detail);
+                            }
+                        } else {
+                            errorMsg = detail;
+                        }
+                    }
                 } catch (_) { /* ignore parse errors */ }
                 throw new Error(errorMsg);
             }
@@ -93,6 +122,86 @@ const API = {
         return this.request('POST', '/api/contracts/upload', formData, true);
     },
 
+    uploadContractWithProgress(file, vendorName, contractTitle, renewalDate, onProgress, onStatusChange, xhrRef = {}) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhrRef.xhr = xhr; // Allow parent to cancel the request
+
+            const url = `${this.BASE_URL}/api/contracts/upload`;
+            xhr.open('POST', url, true);
+
+            const token = localStorage.getItem('kizlly_token') || localStorage.getItem('kizlly_guest_token');
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentage = Math.round((event.loaded / event.total) * 100);
+                    onProgress(percentage);
+                    if (percentage < 100) {
+                        onStatusChange(`Uploading... (${percentage}%)`);
+                    } else {
+                        onStatusChange('Upload complete. Processing document...');
+                    }
+                }
+            });
+
+            xhr.upload.addEventListener('loadstart', () => {
+                onProgress(0);
+                onStatusChange('Preparing upload...');
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch (e) {
+                        reject(new Error('Invalid response from server'));
+                    }
+                } else {
+                    let errorMsg = `Request failed (${xhr.status})`;
+                    try {
+                        const errData = JSON.parse(xhr.responseText);
+                        let detail = errData.detail || errData.message || errData.error;
+                        if (detail) {
+                            if (typeof detail === 'object') {
+                                if (Array.isArray(detail)) {
+                                    errorMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                                } else {
+                                    errorMsg = detail.msg || JSON.stringify(detail);
+                                }
+                            } else {
+                                errorMsg = detail;
+                            }
+                        }
+                    } catch (_) {}
+                    reject(new Error(errorMsg));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error — unable to reach the server. Please check your connection.'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload cancelled by user.'));
+            });
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('vendor_name', vendorName);
+            formData.append('contract_title', contractTitle);
+            if (renewalDate) {
+                formData.append('renewal_date', renewalDate);
+            }
+
+            xhr.send(formData);
+        });
+    },
+
     async getContractStatus(contractId) {
         return this.request('GET', `/api/contracts/${contractId}/status`);
     },
@@ -101,18 +210,17 @@ const API = {
         return this.request('GET', `/api/contracts/${contractId}/clauses`);
     },
 
-<<<<<<< HEAD
-    async submitReview(contractId, decisions) {
-        return this.request('POST', `/api/contracts/${contractId}/review`, { decisions });
-=======
     async submitReview(contractId, payload) {
         const body = Array.isArray(payload) ? { decisions: payload } : payload;
         return this.request('POST', `/api/contracts/${contractId}/review`, body);
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     async getContracts() {
         return this.request('GET', '/api/contracts');
+    },
+
+    async deleteContract(contractId) {
+        return this.request('DELETE', `/api/contracts/${contractId}`);
     },
 
     // PORTFOLIO / DASHBOARD ENDPOINTS (Graph-powered)
@@ -129,8 +237,8 @@ const API = {
         return this.request('GET', '/api/portfolio/vendor-exposure');
     },
 
-    async getRenewalRisk() {
-        return this.request('GET', '/api/portfolio/renewal-risk');
+    async getRenewalRisk(days = 90) {
+        return this.request('GET', `/api/portfolio/renewal-risk?days=${days}`);
     },
 
     async getClausePatterns() {
@@ -147,9 +255,6 @@ const API = {
     },
 
     async getPrivacyLog() {
-<<<<<<< HEAD
-        return this.request('GET', '/api/audit/privacy');
-=======
         return this.request('GET', '/api/privacy/transparency');
     },
 
@@ -161,7 +266,6 @@ const API = {
 
     async markAlertSeen(alertId) {
         return this.request('POST', `/api/contracts/alerts/${alertId}/seen`);
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     // HINGLISH EXPLANATION

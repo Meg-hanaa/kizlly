@@ -15,11 +15,7 @@ import uuid
 import shutil
 import asyncio
 import traceback
-<<<<<<< HEAD
-from datetime import datetime
-=======
 from datetime import datetime, timezone, timedelta
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -128,8 +124,6 @@ def get_workflow_engine():
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 # Renewal watch background worker and date helpers
 # ---------------------------------------------------------------------------
 
@@ -306,10 +300,6 @@ async def run_renewal_watch_loop():
         except Exception as e:
             print(f"[ERROR] Error in renewal watch background check: {e}")
         await asyncio.sleep(10)
-
-
-# ---------------------------------------------------------------------------
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # Application lifecycle
 # ---------------------------------------------------------------------------
 
@@ -329,26 +319,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] Neo4j schema init failed: {e}")
 
-<<<<<<< HEAD
-=======
     # Start renewal watch loop task
     loop_task = asyncio.create_task(run_renewal_watch_loop())
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     print(f"[INFO] {APP_NAME} ready on port {PORT}")
 
     yield
 
     # Shutdown
-<<<<<<< HEAD
-=======
     loop_task.cancel()
     try:
         await loop_task
     except asyncio.CancelledError:
         pass
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     if _neo4j_client:
         _neo4j_client.close()
     print(f"[INFO] {APP_NAME} shutting down")
@@ -358,20 +340,107 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 # ---------------------------------------------------------------------------
 
+# Configure production-ready logging
+import logging
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+logging.basicConfig(
+    level=logging.INFO if not DEBUG else logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+# Custom Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response: Response = await call_next(request)
+        # Production-grade headers
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://d3js.org; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' ws: wss: http: https:;"
+        )
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not DEBUG:
+            # Enforce HSTS in production
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+        return response
+
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     description=APP_DESCRIPTION,
     lifespan=lifespan,
+    docs_url="/docs" if DEBUG else None,
+    redoc_url="/redoc" if DEBUG else None,
 )
+
+# Compression Middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security Headers Middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Environment-based CORS Configuration
+origins = ["*"] if DEBUG else [
+    os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+]
+if not DEBUG and not origins:
+    # Fallback to same-origin for safety
+    origins = []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=origins if origins != ["*"] else ["*"],
+    allow_credentials=True if DEBUG else False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Enforce HTTPS Redirect in production
+if not DEBUG and os.getenv("ENFORCE_HTTPS", "false").lower() == "true":
+    from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# HEALTH CHECK ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health_check():
+    """Simple status check for container orchestration and status monitoring."""
+    status_report = {
+        "status": "healthy",
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": {
+            "sqlite": "connected",
+            "neo4j": "disconnected"
+        }
+    }
+    
+    # Test Neo4j client connection
+    try:
+        neo4j = get_neo4j_client()
+        if neo4j and neo4j.is_connected:
+            status_report["database"]["neo4j"] = "connected"
+    except Exception:
+        status_report["database"]["neo4j"] = "error"
+        status_report["status"] = "degraded"
+        
+    return status_report
 
 
 # ---------------------------------------------------------------------------
@@ -417,18 +486,43 @@ async def api_upload_contract(
     renewal_date: str = Form(default=""),
     user: dict = Depends(get_current_user),
 ):
-    """Upload a contract and start the review workflow."""
-    # Validate file type
+    """Upload a contract securely and start the review workflow."""
+    # 1. Enforce strict extension verification
     allowed_extensions = {".pdf", ".docx", ".doc", ".txt"}
-    ext = os.path.splitext(file.filename)[1].lower()
+    # Handle path traversal / sanitize input filename
+    raw_filename = os.path.basename(file.filename)
+    ext = os.path.splitext(raw_filename)[1].lower()
     if ext not in allowed_extensions:
         raise HTTPException(400, f"Unsupported file type: {ext}")
 
-    # Save uploaded file
-    contract_id = str(uuid.uuid4())[:12]
+    # 2. Enforce strict file size limits (e.g. 10MB)
+    max_size_bytes = 10 * 1024 * 1024
+    content_size = 0
+    
+    # 3. Generate random UUID filename and store outside public folder (UPLOAD_DIR is configured outside public)
+    contract_id = str(uuid.uuid4())
     file_path = UPLOAD_DIR / f"{contract_id}{ext}"
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    
+    # Verify path traversal protection
+    if not str(file_path.resolve()).startswith(str(UPLOAD_DIR.resolve())):
+         raise HTTPException(400, "Invalid file path target")
+
+    try:
+        with open(file_path, "wb") as f:
+            while chunk := file.file.read(8192):
+                content_size += len(chunk)
+                if content_size > max_size_bytes:
+                    raise HTTPException(413, "File exceeds maximum upload size of 10MB")
+                f.write(chunk)
+    except HTTPException:
+        # Clean up partial file on limits failure
+        if file_path.exists():
+            file_path.unlink()
+        raise
+    except Exception as e:
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(500, f"Failed to save upload: {str(e)}")
 
     # Log upload to audit
     audit = get_audit_log()
@@ -436,7 +530,7 @@ async def api_upload_contract(
         workflow_id=contract_id,
         step="upload",
         action="contract_uploaded",
-        details=f"File: {file.filename}, Vendor: {vendor_name}, Title: {contract_title}",
+        details=f"File: {raw_filename}, Vendor: {vendor_name}, Title: {contract_title}",
         reviewer_id=user["username"],
         reviewer_name=user["display_name"],
     )
@@ -446,7 +540,7 @@ async def api_upload_contract(
         _run_workflow,
         contract_id=contract_id,
         file_path=str(file_path),
-        filename=file.filename,
+        filename=raw_filename,
         vendor_name=vendor_name,
         contract_title=contract_title,
         renewal_date=renewal_date,
@@ -455,7 +549,7 @@ async def api_upload_contract(
 
     return ContractUploadResponse(
         contract_id=contract_id,
-        filename=file.filename,
+        filename=raw_filename,
         status=WorkflowStatus.PENDING,
         message="Contract uploaded. Workflow starting...",
     )
@@ -484,6 +578,7 @@ async def _run_workflow(
             faiss_store=get_faiss_store(),
             risk_analyzer=get_risk_analyzer(),
             neo4j_client=get_neo4j_client(),
+            owner=reviewer.get("username") if reviewer else None,
         )
     except Exception as e:
         print(f"[ERROR] Workflow failed for {contract_id}: {e}")
@@ -499,9 +594,10 @@ async def _run_workflow(
 
 @app.get("/api/contracts")
 async def api_list_contracts(user: dict = Depends(get_current_user)):
-    """List all contracts and their workflow status."""
+    """List all contracts belonging to the current user."""
     engine = get_workflow_engine()
-    workflows = engine.list_workflows()
+    username = user.get("username")
+    workflows = engine.list_workflows(owner=username)
     return {"contracts": workflows}
 
 
@@ -512,7 +608,35 @@ async def api_contract_status(contract_id: str, user: dict = Depends(get_current
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
     return workflow
+
+
+@app.delete("/api/contracts/{contract_id}")
+async def api_delete_contract(contract_id: str, user: dict = Depends(get_current_user)):
+    """Delete a contract and purge all workflow files."""
+    engine = get_workflow_engine()
+    workflow = engine.get_workflow(contract_id)
+    if not workflow:
+        raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
+        
+    deleted = engine.delete_workflow(contract_id)
+    
+    # Audit log the purge event
+    audit = get_audit_log()
+    audit.log_event(
+        workflow_id=contract_id,
+        step="purge",
+        action="contract_deleted",
+        details=f"Purged contract state and document templates",
+        reviewer_id=user["username"],
+        reviewer_name=user["display_name"],
+    )
+    
+    return {"message": "Contract deleted successfully", "deleted": deleted}
 
 
 @app.get("/api/contracts/{contract_id}/clauses")
@@ -522,19 +646,14 @@ async def api_contract_clauses(contract_id: str, user: dict = Depends(get_curren
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
     return {
         "contract_id": contract_id,
-<<<<<<< HEAD
-        "status": workflow.get("status", "unknown"),
-        "risk_flags": workflow.get("risk_flags", []),
-        "contradictions": workflow.get("contradictions", []),
-        "privacy_logs": workflow.get("privacy_logs", []),
-=======
         "status": workflow.status,
         "risk_flags": workflow.risk_flags,
         "contradictions": workflow.contradictions,
         "privacy_logs": workflow.privacy_logs,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     }
 
 
@@ -550,12 +669,10 @@ async def api_submit_review(
     workflow = engine.get_workflow(contract_id)
     if not workflow:
         raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
 
-<<<<<<< HEAD
-    if workflow.get("status") != WorkflowStatus.PAUSED_FOR_REVIEW:
-=======
     if workflow.status != WorkflowStatus.PAUSED_FOR_REVIEW:
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         raise HTTPException(400, "Contract is not awaiting review")
 
     # Log each decision to audit
@@ -609,15 +726,15 @@ async def api_portfolio_dashboard(user: dict = Depends(get_current_user)):
     neo4j = get_neo4j_client()
     if not neo4j:
         # Return demo data if Neo4j not configured
-        return _demo_dashboard()
+        return _demo_dashboard(owner=user.get("username"))
 
     try:
         from graph.queries import get_portfolio_stats
-        stats = get_portfolio_stats(neo4j)
+        stats = get_portfolio_stats(neo4j, owner=user.get("username"))
         return stats
     except Exception as e:
         print(f"[WARN] Dashboard query failed: {e}")
-        return _demo_dashboard()
+        return _demo_dashboard(owner=user.get("username"))
 
 
 @app.get("/api/portfolio/graph")
@@ -628,7 +745,7 @@ async def api_graph_data(user: dict = Depends(get_current_user)):
         return {"nodes": [], "edges": []}
 
     try:
-        data = neo4j.get_graph_data()
+        data = neo4j.get_graph_data(owner=user.get("username"))
         return data
     except Exception as e:
         print(f"[WARN] Graph query failed: {e}")
@@ -644,7 +761,7 @@ async def api_vendor_exposure(user: dict = Depends(get_current_user)):
 
     try:
         from graph.queries import get_vendor_exposure
-        return {"vendors": get_vendor_exposure(neo4j)}
+        return {"vendors": get_vendor_exposure(neo4j, owner=user.get("username"))}
     except Exception as e:
         print(f"[WARN] Vendor exposure query failed: {e}")
         return {"vendors": []}
@@ -662,7 +779,7 @@ async def api_renewal_risk(
 
     try:
         from graph.queries import get_renewal_risk
-        return {"renewals": get_renewal_risk(neo4j, days)}
+        return {"renewals": get_renewal_risk(neo4j, days, owner=user.get("username"))}
     except Exception as e:
         print(f"[WARN] Renewal risk query failed: {e}")
         return {"renewals": []}
@@ -702,8 +819,6 @@ async def api_hinglish(
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 # RENEWAL ALERTS
 # ---------------------------------------------------------------------------
 
@@ -718,7 +833,15 @@ async def api_get_alerts(user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     
     for alert in alerts:
+        # Verify contract ownership before delivering alert
         details = get_contract_details(alert["contract_id"], neo4j)
+        
+        # Load state details to check owner parameter
+        engine = get_workflow_engine()
+        workflow = engine.get_workflow(alert["contract_id"])
+        if not workflow or workflow.owner != user.get("username"):
+            continue
+
         renewal_date_str = details.get("renewal_date")
         days_remaining = None
         time_label = "N/A"
@@ -732,10 +855,6 @@ async def api_get_alerts(user: dict = Depends(get_current_user)):
                 
                 # Compute days_remaining for color indicators in frontend
                 if diff_seconds < 86400:
-                    # In seconds (near-future test scale):
-                    # < 30 seconds: Red indicator
-                    # 30-60 seconds: Yellow indicator
-                    # 60-90 seconds: Green indicator
                     if diff_seconds <= 30:
                         days_remaining = 15
                     elif diff_seconds <= 60:
@@ -767,6 +886,11 @@ async def api_mark_alert_seen(alert_id: str, user: dict = Depends(get_current_us
     alert = alert_manager.get_alert(alert_id)
     if not alert:
         raise HTTPException(404, "Alert not found")
+        
+    engine = get_workflow_engine()
+    workflow = engine.get_workflow(alert["contract_id"])
+    if not workflow or workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this alert")
         
     # SQLite status update
     alert_manager.mark_alert_seen(alert_id)
@@ -807,7 +931,6 @@ async def api_mark_alert_seen(alert_id: str, user: dict = Depends(get_current_us
 
 
 # ---------------------------------------------------------------------------
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # AUDIT TRAIL
 # ---------------------------------------------------------------------------
 
@@ -816,10 +939,26 @@ async def api_audit_log(
     workflow_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get the immutable audit trail."""
-    audit = get_audit_log()
-    entries = audit.get_trail(workflow_id)
-    return {"entries": entries}
+    """Get the immutable audit trail scoped to the user."""
+    engine = get_workflow_engine()
+    username = user.get("username")
+    
+    if workflow_id:
+        # Verify ownership
+        workflow = engine.get_workflow(workflow_id)
+        if not workflow or workflow.owner != username:
+            raise HTTPException(403, "Access denied")
+        audit = get_audit_log()
+        entries = audit.get_trail(workflow_id)
+        return {"entries": entries}
+    else:
+        # Load all user workflows to collect their IDs
+        user_workflows = engine.list_workflows(owner=username)
+        user_wf_ids = {w.contract_id for w in user_workflows}
+        audit = get_audit_log()
+        all_entries = audit.get_trail()
+        filtered_entries = [e for e in all_entries if e.get("workflow_id") in user_wf_ids]
+        return {"entries": filtered_entries}
 
 
 @app.get("/api/privacy/transparency")
@@ -827,20 +966,38 @@ async def api_privacy_log(
     workflow_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get transparency log of all data sent to external APIs."""
-    audit = get_audit_log()
-    entries = audit.get_privacy_log(workflow_id)
-    return {"entries": entries}
+    """Get transparency log scoped to the user."""
+    engine = get_workflow_engine()
+    username = user.get("username")
+    
+    if workflow_id:
+        # Verify ownership
+        workflow = engine.get_workflow(workflow_id)
+        if not workflow or workflow.owner != username:
+            raise HTTPException(403, "Access denied")
+        audit = get_audit_log()
+        entries = audit.get_privacy_log(workflow_id)
+        return {"entries": entries}
+    else:
+        # Load all user workflows to collect their IDs
+        user_workflows = engine.list_workflows(owner=username)
+        user_wf_ids = {w.contract_id for w in user_workflows}
+        audit = get_audit_log()
+        all_entries = audit.get_privacy_log()
+        filtered_entries = [e for e in all_entries if e.get("workflow_id") in user_wf_ids]
+        return {"entries": filtered_entries}
 
 
 # ---------------------------------------------------------------------------
 # DEMO DATA (used when Neo4j is not configured)
 # ---------------------------------------------------------------------------
 
-def _demo_dashboard():
-    """Return demo dashboard data when Neo4j is not available."""
+def _demo_dashboard(owner: Optional[str] = None):
+    """Return real dashboard stats from local workflow files when Neo4j is not available."""
     engine = get_workflow_engine()
     workflows = engine.list_workflows()
+    if owner:
+        workflows = [w for w in workflows if w.owner == owner]
 
     total_contracts = len(workflows)
     vendors = set()
@@ -850,17 +1007,28 @@ def _demo_dashboard():
     risk_dist = {}
 
     for w in workflows:
-        if w.get("vendor_name"):
-            vendors.add(w["vendor_name"])
-        for rf in w.get("risk_flags", []):
+        meta = w.contract_meta
+        if meta and meta.vendor_name:
+            vendors.add(meta.vendor_name)
+        for rf in w.risk_flags:
             flagged += 1
-            cat = rf.get("category", "Other")
+            cat = rf.category if hasattr(rf, 'category') else 'Other'
             risk_dist[cat] = risk_dist.get(cat, 0) + 1
-        for rd in w.get("review_decisions", []):
-            if rd.get("decision") == "approved":
+        for rd in w.review_decisions:
+            decision_val = rd.decision.value if hasattr(rd.decision, 'value') else str(rd.decision)
+            if decision_val == "approved":
                 approved += 1
-            elif rd.get("decision") == "rejected":
+            elif decision_val == "rejected":
                 rejected += 1
+
+    # Serialize workflows for the recent_uploads list
+    recent = []
+    for w in workflows[:10]:
+        recent.append({
+            "contract_id": w.contract_id,
+            "status": w.status.value if hasattr(w.status, 'value') else str(w.status),
+            "contract_meta": w.contract_meta.model_dump() if w.contract_meta else {},
+        })
 
     return {
         "total_contracts": total_contracts,
@@ -869,7 +1037,7 @@ def _demo_dashboard():
         "approved_clauses": approved,
         "rejected_clauses": rejected,
         "risk_distribution": risk_dist,
-        "recent_uploads": workflows[:10],
+        "recent_uploads": recent,
     }
 
 

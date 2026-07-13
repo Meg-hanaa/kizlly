@@ -36,64 +36,48 @@ const UploadView = {
                 <div class="card p-lg">
                     <h3 style="margin-top:0;">Upload Contract</h3>
                     <form id="upload-form">
-<<<<<<< HEAD
-                        <div id="drop-zone" class="upload-drop-zone">
-                            <span style="font-size: 2.5rem; margin-bottom: 10px;"></span>
-                            <strong>Drag & drop your contract here</strong>
-                            <span style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">Supports PDF, DOCX, TXT (Max 10MB)</span>
-                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" style="display:none;" />
-                        </div>
-                        
-=======
+                        <!-- Drag and Drop Upload Box -->
                         <div class="form-group">
-                            <label for="file-input">Contract Document (PDF, DOCX, TXT) *</label>
-                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: block; width: 100%; border: 2px solid var(--border-color); padding: 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); cursor: pointer;" />
-                        </div>
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
-                        <div class="form-group">
-                            <label for="vendor-name">Counterparty / Vendor Name *</label>
-                            <input type="text" id="vendor-name" placeholder="e.g., Acme Corporation" required />
-                        </div>
-<<<<<<< HEAD
-                        
-=======
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
-                        <div class="form-group">
-                            <label for="contract-title">Contract Title / Reference *</label>
-                            <input type="text" id="contract-title" placeholder="e.g., Master Services Agreement 2026" required />
-                        </div>
-<<<<<<< HEAD
-                        
-                        <div class="form-group">
-                            <label for="renewal-date">Target Renewal Date</label>
-                            <input type="date" id="renewal-date" />
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary" style="width:100%;"> Start Intelligence Pipeline</button>
-                    </form>
-                </div>
-                
-=======
-
-                        <div class="form-group">
-                            <label for="renewal-date">Target Renewal Date</label>
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <input type="datetime-local" id="renewal-date" style="flex-grow: 1;" />
-                                <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
+                            <label for="file-input" style="font-weight: 600; display: block; margin-bottom: 8px;">Contract Document (PDF, DOCX, TXT) *</label>
+                            <div id="drop-zone" class="upload-zone" style="display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--accent-teal); border-radius: var(--radius-lg); padding: 40px 20px; text-align: center; background: var(--accent-teal-dim); cursor: pointer; transition: all var(--duration-normal) var(--ease-out); position: relative;">
+                                <span class="upload-zone-icon" style="font-size: 3rem; margin-bottom: 12px;">📁</span>
+                                <div class="upload-zone-title" style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Drag & Drop File Here</div>
+                                <div class="upload-zone-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">or drag your contract directly into this area (Max 10MB)</div>
+                                <button type="button" class="btn btn-outline btn-sm" style="pointer-events: none; margin: 0 auto; display: inline-block;">Browse Files</button>
+                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;" />
                             </div>
-                            <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Select a calendar date, or click the button to set the renewal to 3 minutes in the future for testing.</span>
+                            <div id="file-name-preview" style="font-size: 0.85rem; color: var(--accent-teal); font-weight: 600; margin-top: 8px; display: none;"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="vendor-name">Counterparty / Vendor Name</label>
+                            <input type="text" id="vendor-name" class="form-input" placeholder="Leave blank to read directly from document (e.g., Acme Corp)" />
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width:100%;"> Start Intelligence Pipeline</button>
+                         <div class="form-group">
+                             <label for="contract-title">Contract Title / Reference</label>
+                             <input type="text" id="contract-title" class="form-input" placeholder="Leave blank to read directly from document (e.g., MSA 2026)" />
+                         </div>
+                         
+                         <div class="form-group">
+                             <label for="renewal-date">Target Renewal Date</label>
+                             <div style="display: flex; gap: 8px; align-items: center;">
+                                 <input type="datetime-local" id="renewal-date" class="form-input" style="flex-grow: 1;" placeholder="Leave blank to read directly from document" />
+                                 <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
+                             </div>
+                             <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Leave blank to extract automatically from the document, select a date, or set to 3 minutes in the future for testing.</span>
+                         </div>
+
+                        <button type="submit" id="submit-upload-btn" class="btn btn-primary" style="width:100%; margin-top: 10px;"> Start Ingestion Pipeline</button>
                     </form>
                 </div>
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
-                <!-- Active Pipelines List -->
+                <!-- Active Pipelines & Upload Progress List -->
                 <div class="card p-lg">
-                    <h3 style="margin-top:0;">Active Pipelines</h3>
+                    <h3 style="margin-top:0;">Active Uploads & Pipelines</h3>
+                    
+                    <!-- Live uploads progress wrapper -->
+                    <div id="active-uploads-container" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;"></div>
+                    
                     <div id="pipelines-list" class="pipelines-list">
                         <div class="spinner-container"><div class="spinner"></div></div>
                     </div>
@@ -106,49 +90,57 @@ const UploadView = {
     },
 
     setupUploadHandlers() {
-<<<<<<< HEAD
-        const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const uploadForm = document.getElementById('upload-form');
-        let selectedFile = null;
+        const dropZone = document.getElementById('drop-zone');
+        const filePreview = document.getElementById('file-name-preview');
+        const submitBtn = document.getElementById('submit-upload-btn');
 
-        if (dropZone && fileInput) {
-            dropZone.addEventListener('click', () => fileInput.click());
-            
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('dragover');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) {
-                    selectedFile = e.dataTransfer.files[0];
-                    this.updateDropZoneLabel(dropZone, selectedFile.name);
-                }
-            });
-
-            fileInput.addEventListener('change', () => {
-                if (fileInput.files.length > 0) {
-                    selectedFile = fileInput.files[0];
-                    this.updateDropZoneLabel(dropZone, selectedFile.name);
-                }
-            });
+        // Store active XHR uploads to support cancellation & duplicate checks
+        if (!this.activeUploads) {
+            this.activeUploads = {};
         }
 
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', async (e) => {
+        if (dropZone && fileInput) {
+            // Standard input overlays the zone, so click trigger is handled natively by the browser.
+
+            // Drag effects
+            dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                if (!selectedFile) {
-                    App.showToast('Please select or drop a file to upload.', 'error');
-=======
-        const fileInput = document.getElementById('file-input');
-        const uploadForm = document.getElementById('upload-form');
+                dropZone.classList.add('drag-over');
+            });
+
+            ['dragleave', 'dragend'].forEach(type => {
+                dropZone.addEventListener(type, () => {
+                    dropZone.classList.remove('drag-over');
+                });
+            });
+
+            // Handle drop
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    updateFilePreview(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Handle standard browse selection
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) {
+                    updateFilePreview(fileInput.files[0]);
+                }
+            });
+
+            const updateFilePreview = (file) => {
+                if (filePreview) {
+                    filePreview.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    filePreview.style.display = 'block';
+                }
+            };
+        }
 
         // Demo date generator
         const setDemoBtn = document.getElementById('set-demo-date-btn');
@@ -176,7 +168,13 @@ const UploadView = {
                 const file = fileInput.files[0];
                 if (!file) {
                     App.showToast('Please select a file to upload.', 'error');
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
+                    return;
+                }
+
+                // Verify duplicate file uploads
+                const uploadKey = `${file.name}_${file.size}`;
+                if (this.activeUploads[uploadKey]) {
+                    App.showToast('This document is already uploading in progress.', 'warning');
                     return;
                 }
 
@@ -184,40 +182,157 @@ const UploadView = {
                 const contractTitle = document.getElementById('contract-title').value.trim();
                 const renewalDate = document.getElementById('renewal-date').value;
 
-                try {
-                    App.showToast('Uploading contract and starting workflow...', 'info');
-<<<<<<< HEAD
-                    const res = await API.uploadContract(selectedFile, vendorName, contractTitle, renewalDate);
-                    App.showToast(res.message, 'success');
-                    
-                    // Reset upload state
-                    selectedFile = null;
-                    uploadForm.reset();
-                    this.updateDropZoneLabel(dropZone, 'Drag & drop your contract here');
-=======
-                    const res = await API.uploadContract(file, vendorName, contractTitle, renewalDate);
-                    App.showToast(res.message, 'success');
-                    
-                    // Reset upload state
-                    uploadForm.reset();
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
-                    
-                    await this.loadActivePipelines();
-                } catch (err) {
-                    App.showToast(err.message, 'error');
-                }
+                // Disable submission interaction fields during setup
+                fileInput.disabled = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Uploading file...';
+
+                // Initialise visual progress tracker
+                const progressId = 'prog_' + Math.random().toString(36).substring(2, 9);
+                this.renderUploadProgressTrack(progressId, file.name, file.size);
+
+                const performUpload = async () => {
+                    const xhrRef = {};
+                    this.activeUploads[uploadKey] = {
+                        xhrRef,
+                        file,
+                        vendorName,
+                        contractTitle,
+                        renewalDate,
+                        progressId
+                    };
+
+                    // Add cancellation handler
+                    const cancelBtn = document.getElementById(`cancel-${progressId}`);
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', () => {
+                            if (xhrRef.xhr) {
+                                xhrRef.xhr.abort();
+                            }
+                            delete this.activeUploads[uploadKey];
+                            document.getElementById(`track-${progressId}`)?.remove();
+                            
+                            // Re-enable form fields
+                            fileInput.disabled = false;
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Start Ingestion Pipeline';
+                        });
+                    }
+
+                    try {
+                        const res = await API.uploadContractWithProgress(
+                            file, 
+                            vendorName, 
+                            contractTitle, 
+                            renewalDate,
+                            (pct) => {
+                                const bar = document.getElementById(`bar-${progressId}`);
+                                const label = document.getElementById(`lbl-${progressId}`);
+                                if (bar) bar.style.width = `${pct}%`;
+                                if (label) label.textContent = `${pct}%`;
+                            },
+                            (status) => {
+                                const statText = document.getElementById(`status-${progressId}`);
+                                if (statText) statText.textContent = status;
+                            },
+                            xhrRef
+                        );
+
+                        // Success transition
+                        const statText = document.getElementById(`status-${progressId}`);
+                        if (statText) statText.textContent = 'Processing complete.';
+                        App.showToast(res.message, 'success');
+
+                        setTimeout(() => {
+                            document.getElementById(`track-${progressId}`)?.remove();
+                        }, 2000);
+
+                        // Reset upload state
+                        uploadForm.reset();
+                        if (filePreview) {
+                            filePreview.style.display = 'none';
+                            filePreview.textContent = '';
+                        }
+                        delete this.activeUploads[uploadKey];
+
+                        // Re-enable form fields
+                        fileInput.disabled = false;
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Start Ingestion Pipeline';
+
+                        await this.loadActivePipelines();
+                    } catch (err) {
+                        // Error handling: Show retry options in track card
+                        delete this.activeUploads[uploadKey];
+                        const trackCard = document.getElementById(`track-${progressId}`);
+                        if (trackCard) {
+                            trackCard.style.borderLeft = '4px solid var(--accent-rose)';
+                            const statText = document.getElementById(`status-${progressId}`);
+                            if (statText) statText.textContent = `Failed: ${err.message}`;
+                            
+                            // Replace cancel with retry button
+                            const actionArea = document.getElementById(`actions-${progressId}`);
+                            if (actionArea) {
+                                actionArea.innerHTML = `
+                                    <button class="btn btn-outline btn-sm" id="retry-${progressId}" style="padding: 4px 8px; font-size: 0.75rem; color: var(--accent-teal);">Retry</button>
+                                    <button class="btn btn-outline btn-sm" id="discard-${progressId}" style="padding: 4px 8px; font-size: 0.75rem;">Dismiss</button>
+                                `;
+
+                                document.getElementById(`retry-${progressId}`).addEventListener('click', () => {
+                                    trackCard.style.borderLeft = '4px solid var(--accent-teal)';
+                                    actionArea.innerHTML = `<button class="btn btn-outline btn-sm" id="cancel-${progressId}" style="padding: 4px 8px; font-size: 0.75rem;">Cancel</button>`;
+                                    performUpload();
+                                });
+
+                                document.getElementById(`discard-${progressId}`).addEventListener('click', () => {
+                                    trackCard.remove();
+                                    fileInput.disabled = false;
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'Start Ingestion Pipeline';
+                                });
+                            }
+                        } else {
+                            App.showToast(err.message, 'error');
+                            fileInput.disabled = false;
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Start Ingestion Pipeline';
+                        }
+                    }
+                };
+
+                await performUpload();
             });
         }
     },
 
-<<<<<<< HEAD
-    updateDropZoneLabel(dropZone, text) {
-        const textNode = dropZone.querySelector('strong');
-        if (textNode) textNode.textContent = text;
+    renderUploadProgressTrack(id, name, size) {
+        const container = document.getElementById('active-uploads-container');
+        if (!container) return;
+
+        const sizeKb = (size / 1024).toFixed(1);
+        const html = `
+            <div class="card p-md" id="track-${id}" style="border-left: 4px solid var(--accent-teal); display: flex; flex-direction: column; gap: 8px;">
+                <div class="flex-between">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary);">${name}</strong>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 6px;">(${sizeKb} KB)</span>
+                    </div>
+                    <div id="actions-${id}">
+                        <button class="btn btn-outline btn-sm" id="cancel-${id}" style="padding: 4px 8px; font-size: 0.75rem;">Cancel</button>
+                    </div>
+                </div>
+                <div style="background: var(--bg-tertiary); height: 8px; border-radius: 4px; overflow: hidden; position: relative;">
+                    <div id="bar-${id}" style="background: var(--accent-teal); width: 0%; height: 100%; transition: width 0.1s ease;"></div>
+                </div>
+                <div class="flex-between" style="font-size: 0.75rem;">
+                    <span id="status-${id}" style="color: var(--text-secondary); font-weight: 500;">Preparing upload...</span>
+                    <span id="lbl-${id}" style="font-weight: 600; color: var(--text-primary);">0%</span>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
     },
 
-=======
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     async loadActivePipelines() {
         const listContainer = document.getElementById('pipelines-list');
         if (!listContainer) return;
@@ -252,7 +367,7 @@ const UploadView = {
                 }
 
                 return `
-                    <div class="pipeline-item card p-md" style="margin-bottom: 12px; border-left: 4px solid var(--border-color);">
+                    <div class="pipeline-item card p-md" style="margin-bottom: 12px; border-left: 4px solid var(--border-color); position: relative;">
                         <div class="flex-between" style="align-items: flex-start;">
                             <div>
                                 <h4 style="margin:0 0 4px 0; font-weight:600;">${c.contract_meta?.title || c.filename || 'Untitled Contract'}</h4>
@@ -261,12 +376,36 @@ const UploadView = {
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted);">Uploaded: ${dateStr}</div>
                             </div>
-                            <span class="badge ${badgeClass}">${statusText}</span>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                                <span class="badge ${badgeClass}">${statusText}</span>
+                                <button class="btn btn-outline btn-sm delete-pipeline-btn" data-contract-id="${c.contract_id}" style="padding: 2px 6px; font-size: 0.7rem; color: var(--accent-rose); border-color: rgba(239, 68, 68, 0.2);">Delete</button>
+                            </div>
                         </div>
                         ${reviewAction}
                     </div>
                 `;
             }).join('');
+
+            // Register event listeners for delete pipeline buttons
+            listContainer.querySelectorAll('.delete-pipeline-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const contractId = e.currentTarget.getAttribute('data-contract-id');
+                    if (confirm('Are you sure you want to delete this contract pipeline? This will permanently delete the contract workflow and source files.')) {
+                        try {
+                            // Clear polling if running
+                            if (this.pollingIntervals[contractId]) {
+                                clearInterval(this.pollingIntervals[contractId]);
+                                delete this.pollingIntervals[contractId];
+                            }
+                            await API.deleteContract(contractId);
+                            App.showToast('Contract pipeline deleted successfully.', 'success');
+                            await this.loadActivePipelines();
+                        } catch (err) {
+                            App.showToast(`Failed to delete pipeline: ${err.message}`, 'error');
+                        }
+                    }
+                });
+            });
         } catch (err) {
             listContainer.innerHTML = `<p style="color:var(--accent-rose);">${err.message}</p>`;
         }
@@ -332,10 +471,7 @@ const UploadView = {
             </div>
         `;
 
-<<<<<<< HEAD
-=======
         const reviewContainer = document.getElementById('review-container');
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         try {
             const workflow = await API.getContractStatus(contractId);
             const clausesData = await API.getContractClauses(contractId);
@@ -343,10 +479,10 @@ const UploadView = {
             const titleDisplay = document.getElementById('review-title-display');
             if (titleDisplay) titleDisplay.textContent = workflow.contract_meta?.title || workflow.contract_meta?.filename || 'Contract';
 
-<<<<<<< HEAD
-            const reviewContainer = document.getElementById('review-container');
-=======
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
+            // Store loaded workflow for use in submitReview
+            this._currentWorkflow = workflow;
+
+
             if (!reviewContainer) return;
 
             const stepsHtml = this.renderWorkflowSteps(workflow.steps || []);
@@ -439,17 +575,10 @@ const UploadView = {
                 </div>
 
                 <!-- Action Bar -->
-<<<<<<< HEAD
-                <div class="card p-lg flex-between" style="position:sticky; bottom:20px; z-index:100; background:rgba(30, 41, 59, 0.95); backdrop-filter:blur(10px); margin-top: 30px;">
-                    <div style="max-width: 60%;">
-                        <strong style="color:var(--text-primary); display:block; margin-bottom:4px;">Ready to Commit to Graph Ledger?</strong>
-                        <span style="font-size:0.8rem; color:var(--text-secondary);">Approving and committing writes the data model to Neo4j. Rejected clauses are marked as negotiation-critical.</span>
-=======
                 <div class="card p-lg" style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-tertiary);">
                     <div>
                         <strong style="color:#000000; display:block; margin-bottom:4px;">Ready to Commit to Graph Ledger?</strong>
                         <span style="font-size:0.8rem; color:#000000;">Approving and committing writes the data model to Neo4j. Rejected clauses are marked as negotiation-critical.</span>
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
                     </div>
                     <button class="btn btn-primary" onclick="UploadView.submitReview('${contractId}')"> Commit Decisions & Resume Pipeline</button>
                 </div>
@@ -480,25 +609,17 @@ const UploadView = {
             "Audit Trail Finalize"
         ];
 
-<<<<<<< HEAD
-=======
         const stepKeys = ["ingest", "embed_and_search", "risk_analysis", "human_approval", "graph_write", "audit_finalize"];
         const stepsArray = Array.isArray(steps) ? steps : stepKeys.map(key => ({
             status: steps[key] || 'queued',
             retry_count: 0
         }));
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         let html = '<div class="workflow-steps-progress" style="display:flex; justify-content:space-between; margin-top:20px; position:relative;">';
         
         // Background line
         html += '<div style="position:absolute; top:15px; left:0; right:0; height:2px; background:var(--bg-tertiary); z-index:1;"></div>';
 
-<<<<<<< HEAD
-        steps.forEach((step, index) => {
-=======
         stepsArray.forEach((step, index) => {
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             let statusClass = 'step-pending';
             let statusSymbol = index + 1;
 
@@ -600,12 +721,15 @@ const UploadView = {
         
         try {
             App.showToast('Submitting decisions and resuming workflow...', 'info');
+
+            // Read metadata from the already-loaded workflow object (not missing DOM fields)
+            const meta = this._currentWorkflow?.contract_meta || {};
             
             const payload = {
                 decisions: decisionsArray,
-                vendor_name: document.getElementById('vendor-name')?.value || null,
-                contract_title: document.getElementById('contract-title')?.value || null,
-                renewal_date: document.getElementById('renewal-date')?.value || null
+                vendor_name: meta.vendor_name || null,
+                contract_title: meta.title || null,
+                renewal_date: meta.renewal_date || null
             };
 
             const res = await API.submitReview(contractId, payload);

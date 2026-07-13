@@ -183,6 +183,10 @@ When deploying Kizlly to a cloud production environment (such as Render, AWS, or
    *   **Main Dashboard**: [http://localhost:8000](http://localhost:8000)
    *   **API Interactive Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+   **Demo Credentials** (for testing):
+   *   **Username**: `admin`
+   *   **Password**: `KizllySecure2026!`
+
 ---
 
 ## Future Scope

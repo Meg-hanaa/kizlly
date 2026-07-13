@@ -85,8 +85,6 @@ class WorkflowEngine:
         contract_id: str,
         file_path: str,
         filename: str,
-<<<<<<< HEAD
-=======
         vendor_name: Optional[str] = None,
         contract_title: Optional[str] = None,
         renewal_date: Optional[str] = None,
@@ -94,38 +92,15 @@ class WorkflowEngine:
         faiss_store: Any = None,
         risk_analyzer: Any = None,
         neo4j_client: Any = None,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
+        owner: Optional[str] = None,
     ) -> WorkflowState:
-        """Start a new contract review workflow.
-
-        Creates the initial :class:`WorkflowState`, runs the automated
-        steps (ingest → embed → risk analysis), and pauses at the
-        human-approval gate.
-
-        Args:
-            contract_id: Unique identifier for the contract.
-            file_path:   Absolute path to the uploaded file on disk.
-            filename:    Original filename (used to detect file type).
-<<<<<<< HEAD
-=======
-            vendor_name: Optional vendor name override.
-            contract_title: Optional contract title override.
-            renewal_date: Optional renewal date override.
-            embedder: Embedder service.
-            faiss_store: Vector store service.
-            risk_analyzer: AI analysis service.
-            neo4j_client: Neo4j graph client.
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
-
-        Returns:
-            The current :class:`WorkflowState` — may be
-            ``PAUSED_FOR_REVIEW``, ``FAILED``, or ``COMPLETED``.
-        """
+        """Start a new contract review workflow."""
         workflow = WorkflowState(
             contract_id=contract_id,
             status=WorkflowStatus.RUNNING,
             current_step=0,
             steps={name: StepStatus.QUEUED for name in STEP_NAMES},
+            owner=owner,
         )
 
         self._workflows[contract_id] = workflow
@@ -143,11 +118,7 @@ class WorkflowEngine:
         from workflow.steps import step_ingest
 
         workflow = self._execute_step(
-<<<<<<< HEAD
-            workflow, "ingest", step_ingest, workflow, file_path
-=======
             workflow, "ingest", step_ingest, workflow, file_path, vendor_name, contract_title, renewal_date
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -156,11 +127,7 @@ class WorkflowEngine:
         from workflow.steps import step_embed_and_search
 
         workflow = self._execute_step(
-<<<<<<< HEAD
-            workflow, "embed_and_search", step_embed_and_search, workflow, None, None
-=======
             workflow, "embed_and_search", step_embed_and_search, workflow, embedder, faiss_store
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -169,11 +136,7 @@ class WorkflowEngine:
         from workflow.steps import step_risk_analysis
 
         workflow = self._execute_step(
-<<<<<<< HEAD
-            workflow, "risk_analysis", step_risk_analysis, workflow, None
-=======
             workflow, "risk_analysis", step_risk_analysis, workflow, risk_analyzer
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -187,13 +150,41 @@ class WorkflowEngine:
         # After human_approval the status is PAUSED_FOR_REVIEW
         return workflow
 
-<<<<<<< HEAD
-=======
-    def list_workflows(self) -> List[WorkflowState]:
-        """Return a list of all loaded workflow states."""
-        return list(self._workflows.values())
+    def list_workflows(self, owner: Optional[str] = None) -> List[WorkflowState]:
+        """Return a list of all loaded workflow states, optionally filtered by owner."""
+        states = list(self._workflows.values())
+        if owner:
+            return [s for s in states if s.owner == owner]
+        return states
+    def delete_workflow(self, contract_id: str) -> bool:
+        """Delete a workflow state from cache, disk, and any associated document files."""
+        # 1. Clean up cache
+        self._workflows.pop(contract_id, None)
 
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
+        # 2. Clean up JSON state from disk
+        path = _WORKFLOW_DIR / f"{contract_id}.json"
+        deleted = False
+        if path.exists():
+            try:
+                path.unlink()
+                deleted = True
+            except Exception as e:
+                logger.error("Failed to delete workflow state file %s: %s", path.name, e)
+
+        # 3. Clean up uploaded source document
+        try:
+            from config import UPLOAD_DIR
+            target_exts = {".pdf", ".docx", ".doc", ".txt"}
+            for ext in target_exts:
+                f_path = UPLOAD_DIR / f"{contract_id}{ext}"
+                if f_path.exists():
+                    f_path.unlink()
+                    logger.info("Deleted source file %s during workflow purge", f_path.name)
+        except Exception as e:
+            logger.warning("Purge warning: Failed to delete file associated with contract %s: %s", contract_id, e)
+
+        return deleted
+
     def get_workflow(self, contract_id: str) -> Optional[WorkflowState]:
         """Retrieve the current state of a workflow.
 
@@ -217,13 +208,10 @@ class WorkflowEngine:
         contract_id: str,
         review_decisions: List[ClauseReviewDecision],
         reviewer: Dict[str, str],
-<<<<<<< HEAD
-=======
         vendor_name: Optional[str] = None,
         contract_title: Optional[str] = None,
         renewal_date: Optional[str] = None,
         neo4j_client: Any = None,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     ) -> WorkflowState:
         """Resume a workflow after human approval.
 
@@ -235,13 +223,10 @@ class WorkflowEngine:
             contract_id:      Identifier of the paused workflow.
             review_decisions: The reviewer's decisions on flagged clauses.
             reviewer:         Dict with ``id`` and ``name`` keys.
-<<<<<<< HEAD
-=======
             vendor_name:      Optional vendor name override.
             contract_title:   Optional contract title override.
             renewal_date:     Optional renewal date override.
             neo4j_client:     Neo4j graph client.
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         Returns:
             The final :class:`WorkflowState` (should be ``COMPLETED``
@@ -266,9 +251,6 @@ class WorkflowEngine:
         workflow.steps["human_approval"] = StepStatus.SUCCEEDED
         workflow.current_step = STEP_NAMES.index("graph_write")
         workflow.updated_at = datetime.now(timezone.utc)
-<<<<<<< HEAD
-=======
-
         if workflow.contract_meta:
             if vendor_name:
                 workflow.contract_meta.vendor_name = vendor_name
@@ -276,28 +258,22 @@ class WorkflowEngine:
                 workflow.contract_meta.title = contract_title
             if renewal_date:
                 workflow.contract_meta.renewal_date = renewal_date
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         self._save_state(workflow)
 
         self.audit_log.log_event(
             workflow_id=contract_id,
             step="human_approval",
             action="review_submitted",
-            details=f"{len(review_decisions)} decisions by {reviewer.get('name', 'unknown')}",
-            reviewer_id=reviewer.get("id"),
-            reviewer_name=reviewer.get("name"),
+            details=f"{len(review_decisions)} decisions by {reviewer.get('display_name', reviewer.get('username', 'unknown'))}",
+            reviewer_id=reviewer.get("username"),
+            reviewer_name=reviewer.get("display_name", reviewer.get("username")),
         )
 
         # Step 4: graph_write
         from workflow.steps import step_graph_write
 
         workflow = self._execute_step(
-<<<<<<< HEAD
-            workflow, "graph_write", step_graph_write, workflow, None
-=======
             workflow, "graph_write", step_graph_write, workflow, neo4j_client
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         )
         if workflow.status == WorkflowStatus.FAILED:
             return workflow
@@ -308,6 +284,22 @@ class WorkflowEngine:
         workflow = self._execute_step(
             workflow, "audit_finalize", step_audit_finalize, workflow, self.audit_log
         )
+        
+        # Privacy & Data Minimization: Delete temporary processing files (uploaded contracts) after completion
+        try:
+            from config import UPLOAD_DIR
+            # Resolve safe path
+            meta = workflow.contract_meta
+            if meta:
+                target_exts = {".pdf", ".docx", ".doc", ".txt"}
+                for ext in target_exts:
+                    f_path = UPLOAD_DIR / f"{workflow.contract_id}{ext}"
+                    if f_path.exists():
+                        f_path.unlink()
+                        logger.info("Privacy Guard: Cleaned up temporary document file %s", f_path.name)
+        except Exception as cleanup_err:
+            logger.warning("Privacy Guard warning: Failed to delete temporary file: %s", cleanup_err)
+
         return workflow
 
     # ================================================================== #
