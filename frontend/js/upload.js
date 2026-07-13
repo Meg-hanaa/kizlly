@@ -39,11 +39,11 @@ const UploadView = {
                         <!-- Drag and Drop Upload Box -->
                         <div class="form-group">
                             <label for="file-input" style="font-weight: 600; display: block; margin-bottom: 8px;">Contract Document (PDF, DOCX, TXT) *</label>
-                            <div id="drop-zone" style="border: 2px dashed var(--border-color); padding: 30px; border-radius: var(--radius-sm); text-align: center; background: var(--bg-secondary); cursor: pointer; transition: border-color 0.2s, background-color 0.2s;">
-                                <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📁</span>
-                                <span style="font-weight: 600; color: var(--text-primary);">Drag & Drop File Here</span>
-                                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-top: 4px;">or click to browse local files</span>
-                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: none;" />
+                            <div id="drop-zone" class="upload-zone">
+                                <span class="upload-zone-icon">📁</span>
+                                <div class="upload-zone-title">Drag & Drop File Here</div>
+                                <div class="upload-zone-subtitle">or click to browse local files (Max 10MB)</div>
+                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required />
                             </div>
                             <div id="file-name-preview" style="font-size: 0.85rem; color: var(--accent-teal); font-weight: 600; margin-top: 8px; display: none;"></div>
                         </div>
@@ -97,22 +97,19 @@ const UploadView = {
             // Drag effects
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                dropZone.style.borderColor = 'var(--accent-teal)';
-                dropZone.style.backgroundColor = 'rgba(6, 182, 212, 0.05)';
+                dropZone.classList.add('drag-over');
             });
 
             ['dragleave', 'dragend'].forEach(type => {
                 dropZone.addEventListener(type, () => {
-                    dropZone.style.borderColor = 'var(--border-color)';
-                    dropZone.style.backgroundColor = 'var(--bg-secondary)';
+                    dropZone.classList.remove('drag-over');
                 });
             });
 
             // Handle drop
             dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
-                dropZone.style.borderColor = 'var(--border-color)';
-                dropZone.style.backgroundColor = 'var(--bg-secondary)';
+                dropZone.classList.remove('drag-over');
 
                 if (e.dataTransfer.files.length) {
                     fileInput.files = e.dataTransfer.files;
