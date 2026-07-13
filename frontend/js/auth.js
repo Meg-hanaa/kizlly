@@ -27,7 +27,7 @@ const AuthManager = {
                     username: localStorage.getItem('kizlly_guest_username') || 'guest',
                     display_name: 'Guest Reviewer'
                 };
-                this.isAuthenticated = true;
+                this.isAuthenticated = false;
             } else {
                 // Generate a temporary persistent guest token for guest mode
                 const randomId = Math.random().toString(36).substring(2, 9);
@@ -40,7 +40,7 @@ const AuthManager = {
                     username: guestUser,
                     display_name: 'Guest Reviewer'
                 };
-                this.isAuthenticated = true;
+                this.isAuthenticated = false;
             }
         }
         this.updateNavbar();

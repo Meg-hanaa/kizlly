@@ -46,7 +46,13 @@ const API = {
                     if (typeof AuthManager !== 'undefined') {
                         AuthManager.isAuthenticated = false;
                         AuthManager.updateNavbar();
-                        AuthManager.showLoginModal();
+                        
+                        // Guest-Session validation: Only show login modal if we had a token that expired,
+                        // do not show it automatically for guest-mode background polling
+                        const isGuestToken = token && token.startsWith('guest_token_');
+                        if (!isGuestToken) {
+                            AuthManager.showLoginModal();
+                        }
                     }
                 }
                 throw new Error(errorMsg);
