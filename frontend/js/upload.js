@@ -51,22 +51,22 @@ const UploadView = {
                         
                         <div class="form-group">
                             <label for="vendor-name">Counterparty / Vendor Name</label>
-                            <input type="text" id="vendor-name" placeholder="Leave blank to read directly from document (e.g., Acme Corp)" />
+                            <input type="text" id="vendor-name" class="form-input" placeholder="Leave blank to read directly from document (e.g., Acme Corp)" />
                         </div>
 
-                        <div class="form-group">
-                            <label for="contract-title">Contract Title / Reference</label>
-                            <input type="text" id="contract-title" placeholder="Leave blank to read directly from document (e.g., MSA 2026)" />
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="renewal-date">Target Renewal Date</label>
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <input type="datetime-local" id="renewal-date" style="flex-grow: 1;" placeholder="Leave blank to read directly from document" />
-                                <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
-                            </div>
-                            <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Leave blank to extract automatically from the document, select a date, or set to 3 minutes in the future for testing.</span>
-                        </div>
+                         <div class="form-group">
+                             <label for="contract-title">Contract Title / Reference</label>
+                             <input type="text" id="contract-title" class="form-input" placeholder="Leave blank to read directly from document (e.g., MSA 2026)" />
+                         </div>
+                         
+                         <div class="form-group">
+                             <label for="renewal-date">Target Renewal Date</label>
+                             <div style="display: flex; gap: 8px; align-items: center;">
+                                 <input type="datetime-local" id="renewal-date" class="form-input" style="flex-grow: 1;" placeholder="Leave blank to read directly from document" />
+                                 <button type="button" id="set-demo-date-btn" class="btn btn-outline btn-sm" style="white-space: nowrap;">⚡ Set Test Date (3m)</button>
+                             </div>
+                             <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Leave blank to extract automatically from the document, select a date, or set to 3 minutes in the future for testing.</span>
+                         </div>
 
                         <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 10px;"> Start Ingestion Pipeline</button>
                     </form>
