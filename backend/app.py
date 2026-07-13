@@ -806,8 +806,9 @@ async def api_privacy_log(
 # ---------------------------------------------------------------------------
 
 def _demo_dashboard():
-    """Return demo dashboard data when Neo4j is not available."""
+    """Return real dashboard stats from local workflow files when Neo4j is not available."""
     engine = get_workflow_engine()
+    # list_workflows() returns WorkflowState Pydantic objects
     workflows = engine.list_workflows()
 
     total_contracts = len(workflows)
@@ -818,17 +819,29 @@ def _demo_dashboard():
     risk_dist = {}
 
     for w in workflows:
-        if w.get("vendor_name"):
-            vendors.add(w["vendor_name"])
-        for rf in w.get("risk_flags", []):
+        # WorkflowState is a Pydantic model — use attribute access, not .get()
+        meta = w.contract_meta
+        if meta and meta.vendor_name:
+            vendors.add(meta.vendor_name)
+        for rf in w.risk_flags:
             flagged += 1
-            cat = rf.get("category", "Other")
+            cat = rf.category if hasattr(rf, 'category') else 'Other'
             risk_dist[cat] = risk_dist.get(cat, 0) + 1
-        for rd in w.get("review_decisions", []):
-            if rd.get("decision") == "approved":
+        for rd in w.review_decisions:
+            decision_val = rd.decision.value if hasattr(rd.decision, 'value') else str(rd.decision)
+            if decision_val == "approved":
                 approved += 1
-            elif rd.get("decision") == "rejected":
+            elif decision_val == "rejected":
                 rejected += 1
+
+    # Serialize workflows for the recent_uploads list
+    recent = []
+    for w in workflows[:10]:
+        recent.append({
+            "contract_id": w.contract_id,
+            "status": w.status.value if hasattr(w.status, 'value') else str(w.status),
+            "contract_meta": w.contract_meta.model_dump() if w.contract_meta else {},
+        })
 
     return {
         "total_contracts": total_contracts,
@@ -837,7 +850,7 @@ def _demo_dashboard():
         "approved_clauses": approved,
         "rejected_clauses": rejected,
         "risk_distribution": risk_dist,
-        "recent_uploads": workflows[:10],
+        "recent_uploads": recent,
     }
 
 

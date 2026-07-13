@@ -251,9 +251,9 @@ class WorkflowEngine:
             workflow_id=contract_id,
             step="human_approval",
             action="review_submitted",
-            details=f"{len(review_decisions)} decisions by {reviewer.get('name', 'unknown')}",
-            reviewer_id=reviewer.get("id"),
-            reviewer_name=reviewer.get("name"),
+            details=f"{len(review_decisions)} decisions by {reviewer.get('display_name', reviewer.get('username', 'unknown'))}",
+            reviewer_id=reviewer.get("username"),
+            reviewer_name=reviewer.get("display_name", reviewer.get("username")),
         )
 
         # Step 4: graph_write

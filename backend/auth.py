@@ -3,33 +3,64 @@ auth.py - Simple JWT authentication for Kizlly.
 
 Provides reviewer identity tracking: every approval/rejection
 is tied to a specific authenticated user.
+
+Users are persisted to a JSON file on disk so accounts survive
+server restarts.
 """
 
 import hashlib
 import hmac
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
+from pathlib import Path
 from typing import Optional, Dict
 
 import jwt
-from fastapi import HTTPException, Request, Depends
+from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_HOURS
 
 # ---------------------------------------------------------------------------
-# In-memory user store (sufficient for hackathon demo)
+# Disk-persisted user store
 # ---------------------------------------------------------------------------
-_users: Dict[str, dict] = {}
 
-# Pre-seed a demo reviewer account
-_users["admin"] = {
-    "username": "admin",
-    "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
-    "display_name": "Admin Reviewer",
-    "created_at": datetime.utcnow().isoformat(),
-}
+# Store users file next to the audit db in the backend/data directory
+_USERS_FILE: Path = Path(__file__).resolve().parent / "data" / "users.json"
+_USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _load_users() -> Dict[str, dict]:
+    """Load the users dict from disk, returning empty dict on failure."""
+    if not _USERS_FILE.exists():
+        return {}
+    try:
+        return json.loads(_USERS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_users(users: Dict[str, dict]) -> None:
+    """Persist the users dict to disk atomically."""
+    try:
+        _USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[WARN] Failed to persist users: {e}")
+
+
+# Load on module import
+_users: Dict[str, dict] = _load_users()
+
+# Pre-seed a demo reviewer account if not already persisted
+if "admin" not in _users:
+    _users["admin"] = {
+        "username": "admin",
+        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "display_name": "Admin Reviewer",
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    _save_users(_users)
 
 security = HTTPBearer(auto_error=False)
 
@@ -54,7 +85,7 @@ def _verify_password(password: str, password_hash: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def register_user(username: str, password: str, display_name: Optional[str] = None) -> dict:
-    """Register a new reviewer account."""
+    """Register a new reviewer account and persist it to disk."""
     if username in _users:
         raise HTTPException(status_code=409, detail="Username already exists")
 
@@ -71,6 +102,7 @@ def register_user(username: str, password: str, display_name: Optional[str] = No
         "created_at": datetime.utcnow().isoformat(),
     }
     _users[username] = user
+    _save_users(_users)
     return {"username": username, "display_name": user["display_name"]}
 
 

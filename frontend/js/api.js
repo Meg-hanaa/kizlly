@@ -135,8 +135,8 @@ const API = {
         return this.request('GET', '/api/portfolio/vendor-exposure');
     },
 
-    async getRenewalRisk() {
-        return this.request('GET', '/api/portfolio/renewal-risk');
+    async getRenewalRisk(days = 90) {
+        return this.request('GET', `/api/portfolio/renewal-risk?days=${days}`);
     },
 
     async getClausePatterns() {

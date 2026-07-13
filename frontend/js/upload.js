@@ -251,6 +251,9 @@ const UploadView = {
             const titleDisplay = document.getElementById('review-title-display');
             if (titleDisplay) titleDisplay.textContent = workflow.contract_meta?.title || workflow.contract_meta?.filename || 'Contract';
 
+            // Store loaded workflow for use in submitReview
+            this._currentWorkflow = workflow;
+
 
             if (!reviewContainer) return;
 
@@ -490,12 +493,15 @@ const UploadView = {
         
         try {
             App.showToast('Submitting decisions and resuming workflow...', 'info');
+
+            // Read metadata from the already-loaded workflow object (not missing DOM fields)
+            const meta = this._currentWorkflow?.contract_meta || {};
             
             const payload = {
                 decisions: decisionsArray,
-                vendor_name: document.getElementById('vendor-name')?.value || null,
-                contract_title: document.getElementById('contract-title')?.value || null,
-                renewal_date: document.getElementById('renewal-date')?.value || null
+                vendor_name: meta.vendor_name || null,
+                contract_title: meta.title || null,
+                renewal_date: meta.renewal_date || null
             };
 
             const res = await API.submitReview(contractId, payload);

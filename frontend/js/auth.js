@@ -125,6 +125,10 @@ const AuthManager = {
         localStorage.setItem('kizlly_token', this.token);
         localStorage.setItem('kizlly_user', JSON.stringify(this.currentUser));
         this.updateNavbar();
+        // Restart alert polling now that user is authenticated
+        if (typeof AlertManager !== 'undefined') {
+            AlertManager.init();
+        }
     },
 
     updateNavbar() {
@@ -154,6 +158,11 @@ const AuthManager = {
         localStorage.removeItem('kizlly_token');
         localStorage.removeItem('kizlly_user');
         this.updateNavbar();
+        // Stop alert polling so we don't flood 401 errors
+        if (typeof AlertManager !== 'undefined' && AlertManager.pollInterval) {
+            clearInterval(AlertManager.pollInterval);
+            AlertManager.pollInterval = null;
+        }
         App.showToast('Logged out successfully.', 'info');
         window.location.hash = '#/upload';
         this.showLoginModal();
