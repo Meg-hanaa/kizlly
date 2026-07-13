@@ -27,7 +27,7 @@ const DashboardView = {
                         <button class="btn btn-outline" id="dashboardBellBtn" style="padding: 8px 12px; display: flex; align-items: center; gap: 6px; position: relative;">
                             🔔 <span id="dashboardBellCount" class="badge badge-critical" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 50%; display: none;">0</span>
                         </button>
-                        <div id="dashboardBellDropdown" class="card" style="display: none; position: absolute; right: 0; top: 45px; width: 320px; z-index: 100; border: 2px solid var(--border-color); box-shadow: var(--shadow-md); padding: 12px; background: var(--bg-secondary); text-align: left;">
+                        <div id="dashboardBellDropdown" class="card" style="display: none; position: absolute; left: 0; top: 45px; width: 320px; z-index: 100; border: 2px solid var(--border-color); box-shadow: var(--shadow-md); padding: 12px; background: var(--bg-secondary); text-align: left;">
                             <h4 style="margin: 0 0 10px 0; display: flex; justify-content: space-between; align-items: center;">
                                 <span>Renewal Alerts</span>
                                 <span class="badge badge-low" id="dashboardBellCountLabel" style="font-size:0.75rem;">0 unseen</span>
