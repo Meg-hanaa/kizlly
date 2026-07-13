@@ -39,12 +39,12 @@ const UploadView = {
                         <!-- Drag and Drop Upload Box -->
                         <div class="form-group">
                             <label for="file-input" style="font-weight: 600; display: block; margin-bottom: 8px;">Contract Document (PDF, DOCX, TXT) *</label>
-                            <div id="drop-zone" class="upload-zone">
-                                <span class="upload-zone-icon">📁</span>
-                                <div class="upload-zone-title">Drag & Drop File Here</div>
-                                <div class="upload-zone-subtitle" style="margin-bottom: 12px;">or drag your contract directly into this area (Max 10MB)</div>
-                                <button type="button" class="btn btn-outline btn-sm" style="pointer-events: none; margin: 0 auto;">Browse Files</button>
-                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: none;" />
+                            <div id="drop-zone" class="upload-zone" style="display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--accent-teal); border-radius: var(--radius-lg); padding: 40px 20px; text-align: center; background: var(--accent-teal-dim); cursor: pointer; transition: all var(--duration-normal) var(--ease-out); position: relative;">
+                                <span class="upload-zone-icon" style="font-size: 3rem; margin-bottom: 12px;">📁</span>
+                                <div class="upload-zone-title" style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Drag & Drop File Here</div>
+                                <div class="upload-zone-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">or drag your contract directly into this area (Max 10MB)</div>
+                                <button type="button" class="btn btn-outline btn-sm" style="pointer-events: none; margin: 0 auto; display: inline-block;">Browse Files</button>
+                                <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;" />
                             </div>
                             <div id="file-name-preview" style="font-size: 0.85rem; color: var(--accent-teal); font-weight: 600; margin-top: 8px; display: none;"></div>
                         </div>
@@ -92,8 +92,7 @@ const UploadView = {
         const filePreview = document.getElementById('file-name-preview');
 
         if (dropZone && fileInput) {
-            // Click trigger
-            dropZone.addEventListener('click', () => fileInput.click());
+            // Standard input overlays the zone, so click trigger is handled natively by the browser.
 
             // Drag effects
             dropZone.addEventListener('dragover', (e) => {
