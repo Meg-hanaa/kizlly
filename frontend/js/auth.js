@@ -159,11 +159,20 @@ const AuthManager = {
         const navbarUser = document.getElementById('navbarUser');
         if (!navbarUser) return;
 
-        if (this.isAuthenticated && this.currentUser) {
+        const isGuest = this.currentUser && this.currentUser.username.startsWith('guest_');
+
+        if (this.isAuthenticated && this.currentUser && !isGuest) {
             navbarUser.innerHTML = `
                 <div class="user-profile" style="display:flex; align-items:center; gap:12px;">
                     <span id="username-display" style="font-size:0.9rem; font-weight:500;">${this.currentUser.display_name}</span>
                     <button class="btn btn-outline btn-sm" id="logoutBtn" onclick="AuthManager.logout()">Sign Out</button>
+                </div>
+            `;
+        } else if (isGuest) {
+            navbarUser.innerHTML = `
+                <div class="user-profile" style="display:flex; align-items:center; gap:12px;">
+                    <span id="username-display" style="font-size:0.9rem; font-weight:500; opacity:0.8; font-style:italic;">Guest Mode</span>
+                    <button class="btn btn-outline btn-sm" id="loginBtn" onclick="AuthManager.showLoginModal()">Sign In</button>
                 </div>
             `;
         } else {
