@@ -41,10 +41,6 @@ const App = {
         this.updateNavActive(primaryRoute);
 
         // Views router
-        const langBtn = document.getElementById('lang-switch-global-btn');
-        if (langBtn) {
-            langBtn.style.display = (primaryRoute === 'home') ? 'inline-block' : 'none';
-        }
 
         switch (primaryRoute) {
             case 'home':

@@ -150,9 +150,12 @@ class WorkflowEngine:
         # After human_approval the status is PAUSED_FOR_REVIEW
         return workflow
 
-    def list_workflows(self) -> List[WorkflowState]:
-        """Return a list of all loaded workflow states."""
-        return list(self._workflows.values())
+    def list_workflows(self, owner: Optional[str] = None) -> List[WorkflowState]:
+        """Return a list of all loaded workflow states, optionally filtered by owner."""
+        states = list(self._workflows.values())
+        if owner:
+            return [s for s in states if s.owner == owner]
+        return states
     def get_workflow(self, contract_id: str) -> Optional[WorkflowState]:
         """Retrieve the current state of a workflow.
 
@@ -252,6 +255,22 @@ class WorkflowEngine:
         workflow = self._execute_step(
             workflow, "audit_finalize", step_audit_finalize, workflow, self.audit_log
         )
+        
+        # Privacy & Data Minimization: Delete temporary processing files (uploaded contracts) after completion
+        try:
+            from config import UPLOAD_DIR
+            # Resolve safe path
+            meta = workflow.contract_meta
+            if meta:
+                target_exts = {".pdf", ".docx", ".doc", ".txt"}
+                for ext in target_exts:
+                    f_path = UPLOAD_DIR / f"{workflow.contract_id}{ext}"
+                    if f_path.exists():
+                        f_path.unlink()
+                        logger.info("Privacy Guard: Cleaned up temporary document file %s", f_path.name)
+        except Exception as cleanup_err:
+            logger.warning("Privacy Guard warning: Failed to delete temporary file: %s", cleanup_err)
+
         return workflow
 
     # ================================================================== #

@@ -338,51 +338,7 @@ const HomeView = {
                     </div>
                 </div>
             </section>
-
-            <!-- Comparisons Section -->
-            <section style="padding: 80px 0; background: var(--bg-primary); border-bottom: 1px solid var(--border-color);">
-                <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
-                    <div style="text-align:center; max-width:600px; margin:0 auto 50px auto;">
-                        <h2 style="font-size:2.2rem; font-weight:800; letter-spacing:-1.5px; color:var(--text-primary); margin:0 0 16px 0;">
-                            ${t.problemTitle}
-                        </h2>
-                        <p style="color:var(--text-secondary); font-size:0.95rem; margin:0;">
-                            ${t.problemSub}
-                        </p>
-                    </div>
-
-                    <div class="grid-3" style="gap:25px;">
-                        <div class="card p-lg" style="background: var(--bg-secondary); border-color:var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
-                            <h3 style="font-size:1.1rem; color:var(--text-primary); margin:0 0 12px 0;">${t.manual}</h3>
-                            <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.6; margin:0;">${t.manualDesc}</p>
-                        </div>
-
-                        <div class="card p-lg" style="background: var(--bg-secondary); border-color:var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
-                            <h3 style="font-size:1.1rem; color:var(--accent-rose); margin:0 0 12px 0;">${t.chatgpt}</h3>
-                            <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.6; margin:0;">${t.chatgptDesc}</p>
-                        </div>
-
-                        <div class="card p-lg" style="background: var(--bg-secondary); border: 1.5px solid var(--accent-teal); box-shadow: 0 10px 30px rgba(166,138,128,0.04);">
-                            <h3 style="font-size:1.1rem; color:var(--accent-teal); margin:0 0 12px 0;">${t.lexiSolution}</h3>
-                            <p style="color:var(--text-primary); font-weight:500; font-size:0.85rem; line-height:1.6; margin:0;">${t.lexiSolutionDesc}</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
         `;
-
-        this.setupLangSwitch(container);
-    },
-
-    setupLangSwitch(container) {
-        const btn = document.getElementById('lang-switch-global-btn');
-        if (btn) {
-            btn.textContent = this.currentLang === 'en' ? 'Hindi' : 'English';
-            btn.onclick = () => {
-                this.currentLang = this.currentLang === 'en' ? 'hi' : 'en';
-                this.render(container);
-            };
-        }
     }
 };
 window.HomeView = HomeView;

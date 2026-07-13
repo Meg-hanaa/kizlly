@@ -399,18 +399,43 @@ async def api_upload_contract(
     renewal_date: str = Form(default=""),
     user: dict = Depends(get_current_user),
 ):
-    """Upload a contract and start the review workflow."""
-    # Validate file type
+    """Upload a contract securely and start the review workflow."""
+    # 1. Enforce strict extension verification
     allowed_extensions = {".pdf", ".docx", ".doc", ".txt"}
-    ext = os.path.splitext(file.filename)[1].lower()
+    # Handle path traversal / sanitize input filename
+    raw_filename = os.path.basename(file.filename)
+    ext = os.path.splitext(raw_filename)[1].lower()
     if ext not in allowed_extensions:
         raise HTTPException(400, f"Unsupported file type: {ext}")
 
-    # Save uploaded file
-    contract_id = str(uuid.uuid4())[:12]
+    # 2. Enforce strict file size limits (e.g. 10MB)
+    max_size_bytes = 10 * 1024 * 1024
+    content_size = 0
+    
+    # 3. Generate random UUID filename and store outside public folder (UPLOAD_DIR is configured outside public)
+    contract_id = str(uuid.uuid4())
     file_path = UPLOAD_DIR / f"{contract_id}{ext}"
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    
+    # Verify path traversal protection
+    if not str(file_path.resolve()).startswith(str(UPLOAD_DIR.resolve())):
+         raise HTTPException(400, "Invalid file path target")
+
+    try:
+        with open(file_path, "wb") as f:
+            while chunk := file.file.read(8192):
+                content_size += len(chunk)
+                if content_size > max_size_bytes:
+                    raise HTTPException(413, "File exceeds maximum upload size of 10MB")
+                f.write(chunk)
+    except HTTPException:
+        # Clean up partial file on limits failure
+        if file_path.exists():
+            file_path.unlink()
+        raise
+    except Exception as e:
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(500, f"Failed to save upload: {str(e)}")
 
     # Log upload to audit
     audit = get_audit_log()
@@ -418,7 +443,7 @@ async def api_upload_contract(
         workflow_id=contract_id,
         step="upload",
         action="contract_uploaded",
-        details=f"File: {file.filename}, Vendor: {vendor_name}, Title: {contract_title}",
+        details=f"File: {raw_filename}, Vendor: {vendor_name}, Title: {contract_title}",
         reviewer_id=user["username"],
         reviewer_name=user["display_name"],
     )
@@ -428,7 +453,7 @@ async def api_upload_contract(
         _run_workflow,
         contract_id=contract_id,
         file_path=str(file_path),
-        filename=file.filename,
+        filename=raw_filename,
         vendor_name=vendor_name,
         contract_title=contract_title,
         renewal_date=renewal_date,
@@ -437,7 +462,7 @@ async def api_upload_contract(
 
     return ContractUploadResponse(
         contract_id=contract_id,
-        filename=file.filename,
+        filename=raw_filename,
         status=WorkflowStatus.PENDING,
         message="Contract uploaded. Workflow starting...",
     )
@@ -484,10 +509,9 @@ async def _run_workflow(
 async def api_list_contracts(user: dict = Depends(get_current_user)):
     """List all contracts belonging to the current user."""
     engine = get_workflow_engine()
-    workflows = engine.list_workflows()
     username = user.get("username")
-    filtered = [w for w in workflows if w.owner == username]
-    return {"contracts": filtered}
+    workflows = engine.list_workflows(owner=username)
+    return {"contracts": workflows}
 
 
 @app.get("/api/contracts/{contract_id}/status")
@@ -802,10 +826,26 @@ async def api_audit_log(
     workflow_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get the immutable audit trail."""
-    audit = get_audit_log()
-    entries = audit.get_trail(workflow_id)
-    return {"entries": entries}
+    """Get the immutable audit trail scoped to the user."""
+    engine = get_workflow_engine()
+    username = user.get("username")
+    
+    if workflow_id:
+        # Verify ownership
+        workflow = engine.get_workflow(workflow_id)
+        if not workflow or workflow.owner != username:
+            raise HTTPException(403, "Access denied")
+        audit = get_audit_log()
+        entries = audit.get_trail(workflow_id)
+        return {"entries": entries}
+    else:
+        # Load all user workflows to collect their IDs
+        user_workflows = engine.list_workflows(owner=username)
+        user_wf_ids = {w.contract_id for w in user_workflows}
+        audit = get_audit_log()
+        all_entries = audit.get_trail()
+        filtered_entries = [e for e in all_entries if e.get("workflow_id") in user_wf_ids]
+        return {"entries": filtered_entries}
 
 
 @app.get("/api/privacy/transparency")
@@ -813,10 +853,26 @@ async def api_privacy_log(
     workflow_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get transparency log of all data sent to external APIs."""
-    audit = get_audit_log()
-    entries = audit.get_privacy_log(workflow_id)
-    return {"entries": entries}
+    """Get transparency log scoped to the user."""
+    engine = get_workflow_engine()
+    username = user.get("username")
+    
+    if workflow_id:
+        # Verify ownership
+        workflow = engine.get_workflow(workflow_id)
+        if not workflow or workflow.owner != username:
+            raise HTTPException(403, "Access denied")
+        audit = get_audit_log()
+        entries = audit.get_privacy_log(workflow_id)
+        return {"entries": entries}
+    else:
+        # Load all user workflows to collect their IDs
+        user_workflows = engine.list_workflows(owner=username)
+        user_wf_ids = {w.contract_id for w in user_workflows}
+        audit = get_audit_log()
+        all_entries = audit.get_privacy_log()
+        filtered_entries = [e for e in all_entries if e.get("workflow_id") in user_wf_ids]
+        return {"entries": filtered_entries}
 
 
 # ---------------------------------------------------------------------------
