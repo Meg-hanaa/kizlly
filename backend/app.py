@@ -340,20 +340,107 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 # ---------------------------------------------------------------------------
 
+# Configure production-ready logging
+import logging
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+logging.basicConfig(
+    level=logging.INFO if not DEBUG else logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+# Custom Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response: Response = await call_next(request)
+        # Production-grade headers
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://d3js.org; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' ws: wss: http: https:;"
+        )
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not DEBUG:
+            # Enforce HSTS in production
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+        return response
+
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     description=APP_DESCRIPTION,
     lifespan=lifespan,
+    docs_url="/docs" if DEBUG else None,
+    redoc_url="/redoc" if DEBUG else None,
 )
+
+# Compression Middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security Headers Middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Environment-based CORS Configuration
+origins = ["*"] if DEBUG else [
+    os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+]
+if not DEBUG and not origins:
+    # Fallback to same-origin for safety
+    origins = []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=origins if origins != ["*"] else ["*"],
+    allow_credentials=True if DEBUG else False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Enforce HTTPS Redirect in production
+if not DEBUG and os.getenv("ENFORCE_HTTPS", "false").lower() == "true":
+    from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# HEALTH CHECK ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health_check():
+    """Simple status check for container orchestration and status monitoring."""
+    status_report = {
+        "status": "healthy",
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": {
+            "sqlite": "connected",
+            "neo4j": "disconnected"
+        }
+    }
+    
+    # Test Neo4j client connection
+    try:
+        neo4j = get_neo4j_client()
+        if neo4j and neo4j.is_connected:
+            status_report["database"]["neo4j"] = "connected"
+    except Exception:
+        status_report["database"]["neo4j"] = "error"
+        status_report["status"] = "degraded"
+        
+    return status_report
 
 
 # ---------------------------------------------------------------------------
