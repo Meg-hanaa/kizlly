@@ -1,7 +1,6 @@
 <img width="4320" height="1440" alt="hh26 main poster 2 with sponsors 3x1 (4320 x 1440 px) (2)" src="https://github.com/user-attachments/assets/c698b2cd-da84-4cb0-9276-125c6a7244aa" />
 
-# Kizlly - Privacy-Preserving Contract Audit Engine
-
+# Kizlly - Contract Intelligence Platform
 Kizlly is a local-first, privacy-respecting contract audit platform. It allows legal compliance teams and corporate reviewers to inspect, edit, and approve RAG-assisted risk analysis reports locally, preventing data leakage while mapping complex multi-vendor liabilities as an interactive relationship graph.
 
 ---
