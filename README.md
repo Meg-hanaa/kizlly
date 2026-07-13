@@ -20,9 +20,14 @@ Kizlly solves this by processing contracts through an isolated, multi-stage hybr
 
 ## Problem & Domain
 
-Describe the problem you are solving.
+Corporate legal agreements are filled with hidden structural risks, such as auto-renewal traps, unilateral termination parameters, and uncapped liability limits. However, legal teams face a critical challenge:
+1. **Manual Audit Bottleneck**: Reviewing contracts manually is slow, costly, and leads to human error when searching across hundreds of historical agreements.
+2. **Confidentiality Breach**: Uploading full agreements to general-purpose cloud LLM models exposes confidential trade secrets, customer terms, and vendor pricing to third-party databases.
+3. **Linear Data Blindspots**: Traditional databases parse contracts individually, making it impossible to spot systemic vulnerabilities (e.g. knowing that 12 active contracts share a liability risk with the same single vendor).
 
-**Themes Selected (at least one):**
+Kizlly solves these challenges by combining a local-first RAG chunking layout (which never uploads full files to the cloud) with Neo4j's relational graph storage to model how contracts, vendors, and liabilities relate dynamically across your entire business portfolio.
+
+**Themes Selected:**
 - [x] Human Experience & Productivity  
 - [ ] Climate & Sustainability Systems  
 - [ ] HealthTech & Bio Platforms  
