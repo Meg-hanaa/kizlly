@@ -696,7 +696,15 @@ async def api_get_alerts(user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     
     for alert in alerts:
+        # Verify contract ownership before delivering alert
         details = get_contract_details(alert["contract_id"], neo4j)
+        
+        # Load state details to check owner parameter
+        engine = get_workflow_engine()
+        workflow = engine.get_workflow(alert["contract_id"])
+        if not workflow or workflow.owner != user.get("username"):
+            continue
+
         renewal_date_str = details.get("renewal_date")
         days_remaining = None
         time_label = "N/A"
@@ -710,10 +718,6 @@ async def api_get_alerts(user: dict = Depends(get_current_user)):
                 
                 # Compute days_remaining for color indicators in frontend
                 if diff_seconds < 86400:
-                    # In seconds (near-future test scale):
-                    # < 30 seconds: Red indicator
-                    # 30-60 seconds: Yellow indicator
-                    # 60-90 seconds: Green indicator
                     if diff_seconds <= 30:
                         days_remaining = 15
                     elif diff_seconds <= 60:
@@ -745,6 +749,11 @@ async def api_mark_alert_seen(alert_id: str, user: dict = Depends(get_current_us
     alert = alert_manager.get_alert(alert_id)
     if not alert:
         raise HTTPException(404, "Alert not found")
+        
+    engine = get_workflow_engine()
+    workflow = engine.get_workflow(alert["contract_id"])
+    if not workflow or workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this alert")
         
     # SQLite status update
     alert_manager.mark_alert_seen(alert_id)
