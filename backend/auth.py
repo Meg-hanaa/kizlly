@@ -61,7 +61,7 @@ if "admin" not in _users:
 for username, user_data in list(_users.items()):
     h = user_data.get("password_hash", "")
     # Check if this is the seed admin user still using admin123
-    if username == "admin":
+    if username == "admin" and not h.startswith("$argon2id$"):
         try:
             # Reseed with secure password
             user_data["password_hash"] = ph.hash("KizllySecure2026!")
