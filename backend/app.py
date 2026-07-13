@@ -15,11 +15,7 @@ import uuid
 import shutil
 import asyncio
 import traceback
-<<<<<<< HEAD
-from datetime import datetime
-=======
 from datetime import datetime, timezone, timedelta
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -128,8 +124,6 @@ def get_workflow_engine():
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 # Renewal watch background worker and date helpers
 # ---------------------------------------------------------------------------
 
@@ -306,10 +300,6 @@ async def run_renewal_watch_loop():
         except Exception as e:
             print(f"[ERROR] Error in renewal watch background check: {e}")
         await asyncio.sleep(10)
-
-
-# ---------------------------------------------------------------------------
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # Application lifecycle
 # ---------------------------------------------------------------------------
 
@@ -329,26 +319,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] Neo4j schema init failed: {e}")
 
-<<<<<<< HEAD
-=======
     # Start renewal watch loop task
     loop_task = asyncio.create_task(run_renewal_watch_loop())
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     print(f"[INFO] {APP_NAME} ready on port {PORT}")
 
     yield
 
     # Shutdown
-<<<<<<< HEAD
-=======
     loop_task.cancel()
     try:
         await loop_task
     except asyncio.CancelledError:
         pass
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     if _neo4j_client:
         _neo4j_client.close()
     print(f"[INFO] {APP_NAME} shutting down")
@@ -524,17 +506,10 @@ async def api_contract_clauses(contract_id: str, user: dict = Depends(get_curren
         raise HTTPException(404, "Contract not found")
     return {
         "contract_id": contract_id,
-<<<<<<< HEAD
-        "status": workflow.get("status", "unknown"),
-        "risk_flags": workflow.get("risk_flags", []),
-        "contradictions": workflow.get("contradictions", []),
-        "privacy_logs": workflow.get("privacy_logs", []),
-=======
         "status": workflow.status,
         "risk_flags": workflow.risk_flags,
         "contradictions": workflow.contradictions,
         "privacy_logs": workflow.privacy_logs,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     }
 
 
@@ -551,11 +526,7 @@ async def api_submit_review(
     if not workflow:
         raise HTTPException(404, "Contract not found")
 
-<<<<<<< HEAD
-    if workflow.get("status") != WorkflowStatus.PAUSED_FOR_REVIEW:
-=======
     if workflow.status != WorkflowStatus.PAUSED_FOR_REVIEW:
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         raise HTTPException(400, "Contract is not awaiting review")
 
     # Log each decision to audit
@@ -702,8 +673,6 @@ async def api_hinglish(
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 # RENEWAL ALERTS
 # ---------------------------------------------------------------------------
 
@@ -807,7 +776,6 @@ async def api_mark_alert_seen(alert_id: str, user: dict = Depends(get_current_us
 
 
 # ---------------------------------------------------------------------------
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 # AUDIT TRAIL
 # ---------------------------------------------------------------------------
 

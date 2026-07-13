@@ -156,12 +156,9 @@ class ContractMetadata(BaseModel):
     total_chunks: int = 0
     total_chars: int = 0
     language: str = "English"
-<<<<<<< HEAD
-=======
     renewal_date: Optional[str] = None
     notice_deadline: Optional[str] = None
     auto_renewal: Optional[bool] = None
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
 
 class ContractUploadResponse(BaseModel):

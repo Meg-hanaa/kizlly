@@ -93,7 +93,7 @@ def create_token(username: str, display_name: str) -> str:
         "sub": username,
         "name": display_name,
         "iat": int(time.time()),
-        "exp": int((datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS)).timestamp()),
+        "exp": int(time.time() + JWT_EXPIRY_HOURS * 3600),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 

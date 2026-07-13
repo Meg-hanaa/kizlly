@@ -31,14 +31,25 @@ const API = {
 
             // Handle 401 — token expired or invalid
             if (response.status === 401) {
-                localStorage.removeItem('kizlly_token');
-                localStorage.removeItem('kizlly_user');
-                if (typeof AuthManager !== 'undefined') {
-                    AuthManager.isAuthenticated = false;
-                    AuthManager.updateNavbar();
-                    AuthManager.showLoginModal();
+                let errorMsg = 'Session expired. Please sign in again.';
+                try {
+                    const errData = await response.json();
+                    if (errData.detail) {
+                        errorMsg = errData.detail;
+                    }
+                } catch (_) {}
+
+                // Only clear session and redirect if this is NOT an auth attempt
+                if (!path.includes('/api/auth/')) {
+                    localStorage.removeItem('kizlly_token');
+                    localStorage.removeItem('kizlly_user');
+                    if (typeof AuthManager !== 'undefined') {
+                        AuthManager.isAuthenticated = false;
+                        AuthManager.updateNavbar();
+                        AuthManager.showLoginModal();
+                    }
                 }
-                throw new Error('Session expired. Please sign in again.');
+                throw new Error(errorMsg);
             }
 
             // Handle non-OK responses
@@ -101,14 +112,9 @@ const API = {
         return this.request('GET', `/api/contracts/${contractId}/clauses`);
     },
 
-<<<<<<< HEAD
-    async submitReview(contractId, decisions) {
-        return this.request('POST', `/api/contracts/${contractId}/review`, { decisions });
-=======
     async submitReview(contractId, payload) {
         const body = Array.isArray(payload) ? { decisions: payload } : payload;
         return this.request('POST', `/api/contracts/${contractId}/review`, body);
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     async getContracts() {
@@ -147,9 +153,6 @@ const API = {
     },
 
     async getPrivacyLog() {
-<<<<<<< HEAD
-        return this.request('GET', '/api/audit/privacy');
-=======
         return this.request('GET', '/api/privacy/transparency');
     },
 
@@ -161,7 +164,6 @@ const API = {
 
     async markAlertSeen(alertId) {
         return this.request('POST', `/api/contracts/alerts/${alertId}/seen`);
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     },
 
     // HINGLISH EXPLANATION

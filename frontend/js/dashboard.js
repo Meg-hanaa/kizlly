@@ -21,11 +21,6 @@ const DashboardView = {
                     <h2>Portfolio Risk Intelligence</h2>
                     <p>Aggregated contract risk metrics powered by Cypher graph queries.</p>
                 </div>
-<<<<<<< HEAD
-                <span class="badge badge-low" style="padding: 6px 12px; font-weight:600;"> Graph-Native Store (Neo4j)</span>
-            </div>
-            
-=======
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <!-- Notification Bell -->
                     <div class="bell-container" id="dashboardBellContainer" style="position: relative;">
@@ -47,15 +42,11 @@ const DashboardView = {
             </div>
             
             <div id="alerts-panel"></div>
-            
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
             <div id="dashboard-content">
                 <div class="spinner-container"><div class="spinner"></div></div>
             </div>
         `;
 
-<<<<<<< HEAD
-=======
         // Setup dropdown toggle
         const bellBtn = document.getElementById('dashboardBellBtn');
         const bellDropdown = document.getElementById('dashboardBellDropdown');
@@ -77,8 +68,6 @@ const DashboardView = {
         if (typeof AlertManager !== 'undefined') {
             AlertManager.loadAlerts();
         }
-
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         try {
             const stats = await API.getDashboard();
             const vendors = await API.getVendorExposure();

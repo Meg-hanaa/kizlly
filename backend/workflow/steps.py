@@ -35,28 +35,20 @@ logger = logging.getLogger(__name__)
 def step_ingest(
     workflow: WorkflowState,
     file_path: str,
-<<<<<<< HEAD
-) -> WorkflowState:
-    """Parse an uploaded contract and extract raw text.
-=======
     vendor_name: Optional[str] = None,
     contract_title: Optional[str] = None,
     renewal_date: Optional[str] = None,
 ) -> WorkflowState:
     """Parse an uploaded contract and extract raw text and metadata.
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Chooses the parser based on file extension (``.pdf`` or ``.docx``).
 
     Args:
         workflow:  Current workflow state.
         file_path: Absolute path to the uploaded file.
-<<<<<<< HEAD
-=======
         vendor_name: Counterparty name.
         contract_title: Title of the contract.
         renewal_date: Target renewal date (optional manual override).
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
     Returns:
         Updated :class:`WorkflowState` with ``extracted_text`` and
@@ -79,19 +71,6 @@ def step_ingest(
     elif ext in (".docx", ".doc"):
         from ingestion.docx_parser import parse_docx
         text = parse_docx(file_path)
-<<<<<<< HEAD
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
-
-    # Build contract metadata
-    filename = os.path.basename(file_path)
-    workflow.extracted_text = text
-    workflow.contract_meta = ContractMetadata(
-        id=workflow.contract_id,
-        filename=filename,
-        title=filename.rsplit(".", 1)[0],
-        total_chars=len(text),
-=======
     elif ext == ".txt":
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read()
@@ -164,7 +143,6 @@ def step_ingest(
         renewal_date=final_renewal_date,
         notice_deadline=final_notice_deadline,
         auto_renewal=auto_renewal,
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
     )
     workflow.updated_at = datetime.now(timezone.utc)
 
@@ -431,9 +409,6 @@ def step_graph_write(
                 expiration_date=None,
                 value=0.0,
                 status=meta.status.value if meta.status else "Active",
-<<<<<<< HEAD
-            )
-=======
                 renewal_date=getattr(meta, "renewal_date", None),
                 notice_deadline=getattr(meta, "notice_deadline", None),
             )
@@ -445,7 +420,6 @@ def step_graph_write(
                     neo4j_client.set_renewal_date(meta.id, renewal_date_val)
                 except Exception as ex:
                     logger.warning("[graph_write] Failed to set renewal date relationship: %s", ex)
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
 
         # Create clause + risk nodes for approved clauses only
         for risk_flag in workflow.risk_flags:

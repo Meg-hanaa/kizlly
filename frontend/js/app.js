@@ -5,10 +5,7 @@
 const App = {
     init() {
         AuthManager.init();
-<<<<<<< HEAD
-=======
         AlertManager.init();
->>>>>>> 72c1ebc (Implement contract renewal alerts, fix graph visualization, layouts, and backend query routing)
         this.setupRouter();
         this.setupNavbarActiveLink();
     },
