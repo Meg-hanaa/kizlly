@@ -367,7 +367,7 @@ const UploadView = {
                 }
 
                 return `
-                    <div class="pipeline-item card p-md" style="margin-bottom: 12px; border-left: 4px solid var(--border-color);">
+                    <div class="pipeline-item card p-md" style="margin-bottom: 12px; border-left: 4px solid var(--border-color); position: relative;">
                         <div class="flex-between" style="align-items: flex-start;">
                             <div>
                                 <h4 style="margin:0 0 4px 0; font-weight:600;">${c.contract_meta?.title || c.filename || 'Untitled Contract'}</h4>
@@ -376,12 +376,36 @@ const UploadView = {
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted);">Uploaded: ${dateStr}</div>
                             </div>
-                            <span class="badge ${badgeClass}">${statusText}</span>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                                <span class="badge ${badgeClass}">${statusText}</span>
+                                <button class="btn btn-outline btn-sm delete-pipeline-btn" data-contract-id="${c.contract_id}" style="padding: 2px 6px; font-size: 0.7rem; color: var(--accent-rose); border-color: rgba(239, 68, 68, 0.2);">Delete</button>
+                            </div>
                         </div>
                         ${reviewAction}
                     </div>
                 `;
             }).join('');
+
+            // Register event listeners for delete pipeline buttons
+            listContainer.querySelectorAll('.delete-pipeline-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const contractId = e.currentTarget.getAttribute('data-contract-id');
+                    if (confirm('Are you sure you want to delete this contract pipeline? This will permanently delete the contract workflow and source files.')) {
+                        try {
+                            // Clear polling if running
+                            if (this.pollingIntervals[contractId]) {
+                                clearInterval(this.pollingIntervals[contractId]);
+                                delete this.pollingIntervals[contractId];
+                            }
+                            await API.deleteContract(contractId);
+                            App.showToast('Contract pipeline deleted successfully.', 'success');
+                            await this.loadActivePipelines();
+                        } catch (err) {
+                            App.showToast(`Failed to delete pipeline: ${err.message}`, 'error');
+                        }
+                    }
+                });
+            });
         } catch (err) {
             listContainer.innerHTML = `<p style="color:var(--accent-rose);">${err.message}</p>`;
         }

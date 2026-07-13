@@ -526,6 +526,32 @@ async def api_contract_status(contract_id: str, user: dict = Depends(get_current
     return workflow
 
 
+@app.delete("/api/contracts/{contract_id}")
+async def api_delete_contract(contract_id: str, user: dict = Depends(get_current_user)):
+    """Delete a contract and purge all workflow files."""
+    engine = get_workflow_engine()
+    workflow = engine.get_workflow(contract_id)
+    if not workflow:
+        raise HTTPException(404, "Contract not found")
+    if workflow.owner != user.get("username"):
+        raise HTTPException(403, "Access denied: you do not own this contract")
+        
+    deleted = engine.delete_workflow(contract_id)
+    
+    # Audit log the purge event
+    audit = get_audit_log()
+    audit.log_event(
+        workflow_id=contract_id,
+        step="purge",
+        action="contract_deleted",
+        details=f"Purged contract state and document templates",
+        reviewer_id=user["username"],
+        reviewer_name=user["display_name"],
+    )
+    
+    return {"message": "Contract deleted successfully", "deleted": deleted}
+
+
 @app.get("/api/contracts/{contract_id}/clauses")
 async def api_contract_clauses(contract_id: str, user: dict = Depends(get_current_user)):
     """Get flagged clauses for a contract awaiting review."""

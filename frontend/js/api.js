@@ -219,6 +219,10 @@ const API = {
         return this.request('GET', '/api/contracts');
     },
 
+    async deleteContract(contractId) {
+        return this.request('DELETE', `/api/contracts/${contractId}`);
+    },
+
     // PORTFOLIO / DASHBOARD ENDPOINTS (Graph-powered)
 
     async getDashboard() {

@@ -156,6 +156,35 @@ class WorkflowEngine:
         if owner:
             return [s for s in states if s.owner == owner]
         return states
+    def delete_workflow(self, contract_id: str) -> bool:
+        """Delete a workflow state from cache, disk, and any associated document files."""
+        # 1. Clean up cache
+        self._workflows.pop(contract_id, None)
+
+        # 2. Clean up JSON state from disk
+        path = _WORKFLOW_DIR / f"{contract_id}.json"
+        deleted = False
+        if path.exists():
+            try:
+                path.unlink()
+                deleted = True
+            except Exception as e:
+                logger.error("Failed to delete workflow state file %s: %s", path.name, e)
+
+        # 3. Clean up uploaded source document
+        try:
+            from config import UPLOAD_DIR
+            target_exts = {".pdf", ".docx", ".doc", ".txt"}
+            for ext in target_exts:
+                f_path = UPLOAD_DIR / f"{contract_id}{ext}"
+                if f_path.exists():
+                    f_path.unlink()
+                    logger.info("Deleted source file %s during workflow purge", f_path.name)
+        except Exception as e:
+            logger.warning("Purge warning: Failed to delete file associated with contract %s: %s", contract_id, e)
+
+        return deleted
+
     def get_workflow(self, contract_id: str) -> Optional[WorkflowState]:
         """Retrieve the current state of a workflow.
 
