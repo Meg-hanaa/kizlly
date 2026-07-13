@@ -75,10 +75,12 @@ def _build_page_map(text: str) -> List[tuple]:
 
 
 def _cap_sentences(text: str, max_sentences: int) -> str:
-    """Truncate *text* to at most *max_sentences* sentences."""
-    sentences = _SENTENCE_SPLIT_RE.split(text)
+    """Truncate *text* to at most *max_sentences* sentences, filtering out page markers."""
+    # Filter out page markers to avoid sentence splitting issues
+    cleaned = _PAGE_MARKER_RE.sub("", text).strip()
+    sentences = _SENTENCE_SPLIT_RE.split(cleaned)
     if len(sentences) <= max_sentences:
-        return text
+        return cleaned
     return " ".join(sentences[:max_sentences])
 
 
