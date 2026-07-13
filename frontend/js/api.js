@@ -64,7 +64,18 @@ const API = {
                 let errorMsg = `Request failed (${response.status})`;
                 try {
                     const errData = await response.json();
-                    errorMsg = errData.detail || errData.message || errData.error || errorMsg;
+                    let detail = errData.detail || errData.message || errData.error;
+                    if (detail) {
+                        if (typeof detail === 'object') {
+                            if (Array.isArray(detail)) {
+                                errorMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                            } else {
+                                errorMsg = detail.msg || JSON.stringify(detail);
+                            }
+                        } else {
+                            errorMsg = detail;
+                        }
+                    }
                 } catch (_) { /* ignore parse errors */ }
                 throw new Error(errorMsg);
             }
