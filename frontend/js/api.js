@@ -11,8 +11,9 @@ const API = {
         const url = `${this.BASE_URL}${path}`;
         const headers = {};
         const token = localStorage.getItem('kizlly_token') || localStorage.getItem('kizlly_guest_token');
-
-        if (token) {
+        // Authentication endpoints should not send bearer tokens
+        const isAuthRoute = path.includes('/api/auth/');
+        if (token && !isAuthRoute) {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
