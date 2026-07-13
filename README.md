@@ -20,9 +20,14 @@ Kizlly solves this by processing contracts through an isolated, multi-stage hybr
 
 ## Problem & Domain
 
-Describe the problem you are solving.
+Corporate legal agreements are filled with hidden structural risks, such as auto-renewal traps, unilateral termination parameters, and uncapped liability limits. However, legal teams face a critical challenge:
+1. **Manual Audit Bottleneck**: Reviewing contracts manually is slow, costly, and leads to human error when searching across hundreds of historical agreements.
+2. **Confidentiality Breach**: Uploading full agreements to general-purpose cloud LLM models exposes confidential trade secrets, customer terms, and vendor pricing to third-party databases.
+3. **Linear Data Blindspots**: Traditional databases parse contracts individually, making it impossible to spot systemic vulnerabilities (e.g. knowing that 12 active contracts share a liability risk with the same single vendor).
 
-**Themes Selected (at least one):**
+Kizlly solves these challenges by combining a local-first RAG chunking layout (which never uploads full files to the cloud) with Neo4j's relational graph storage to model how contracts, vendors, and liabilities relate dynamically across your entire business portfolio.
+
+**Themes Selected:**
 - [x] Human Experience & Productivity  
 - [ ] Climate & Sustainability Systems  
 - [ ] HealthTech & Bio Platforms  
@@ -53,9 +58,17 @@ Clearly describe:
 ### Team Name:  
 `clearaura`
 
-### Team Members:  
-- **Ananya Raj** (Team Member)  
-- **Meghana Ranjith** (Team Member)  
+### Team Members:
+
+**Ananya Raj** — Lead Full-Stack Architect & Developer
+- **Full-Stack Development**: Engineered the FastAPI backend, static file routing, and the single-page application (SPA) frontend with the custom Cozy design system.
+- **AI & Ingestion Pipeline**: Designed the local contract parser, RAG sentence chunker, local FAISS vector search, and Groq LLaMA risk classification step functions.
+- **Database & Ledger Security**: Built the Neo4j relational graph queries, the Argon2id user isolation authentication model, and the SQLite privacy audit database.
+
+**Meghana Ranjith** — Lead DevOps & System Validator
+- **Cloud Infrastructure & Deployment**: Configured and executed the containerized application deployment on Render using Docker, managing environment variables and persistent volume allocations.
+- **End-to-End System Validation**: Designed the testing protocols to evaluate parsing, embedding generation, and Neo4j ledger writes across multiple sample document uploads.
+- **DevSecOps & Release Operations**: Managed the GitHub repository workspace, oversaw branch merges, and conducted dependency check audits.
 
 ### Your Approach:
 - **Why we chose this problem**: Contract management is a critical business bottleneck where privacy is paramount but currently ignored by generic AI wrapper apps.
