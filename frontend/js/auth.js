@@ -18,6 +18,30 @@ const AuthManager = {
             } catch (e) {
                 this.logout();
             }
+        } else {
+            // Check if guest token already exists
+            const guestToken = localStorage.getItem('kizlly_guest_token');
+            if (guestToken) {
+                this.token = guestToken;
+                this.currentUser = {
+                    username: localStorage.getItem('kizlly_guest_username') || 'guest',
+                    display_name: 'Guest Reviewer'
+                };
+                this.isAuthenticated = true;
+            } else {
+                // Generate a temporary persistent guest token for guest mode
+                const randomId = Math.random().toString(36).substring(2, 9);
+                const guestUser = 'guest_' + randomId;
+                const tempToken = 'guest_token_' + randomId;
+                localStorage.setItem('kizlly_guest_token', tempToken);
+                localStorage.setItem('kizlly_guest_username', guestUser);
+                this.token = tempToken;
+                this.currentUser = {
+                    username: guestUser,
+                    display_name: 'Guest Reviewer'
+                };
+                this.isAuthenticated = true;
+            }
         }
         this.updateNavbar();
     },
@@ -157,6 +181,8 @@ const AuthManager = {
         this.isAuthenticated = false;
         localStorage.removeItem('kizlly_token');
         localStorage.removeItem('kizlly_user');
+        localStorage.removeItem('kizlly_guest_token');
+        localStorage.removeItem('kizlly_guest_username');
         this.updateNavbar();
         // Stop alert polling so we don't flood 401 errors
         if (typeof AlertManager !== 'undefined' && AlertManager.pollInterval) {
@@ -164,15 +190,12 @@ const AuthManager = {
             AlertManager.pollInterval = null;
         }
         App.showToast('Logged out successfully.', 'info');
-        window.location.hash = '#/upload';
-        this.showLoginModal();
+        // Restart in guest mode by re-running init
+        this.init();
+        window.location.hash = '#/home';
     },
 
     requireAuth() {
-        if (!this.isAuthenticated) {
-            this.showLoginModal();
-            return false;
-        }
         return true;
     }
 };
