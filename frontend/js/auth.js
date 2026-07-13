@@ -146,6 +146,11 @@ const AuthManager = {
             display_name: response.display_name
         };
         this.isAuthenticated = true;
+        
+        // Remove guest sessions to ensure the regular token is exclusively used
+        localStorage.removeItem('kizlly_guest_token');
+        localStorage.removeItem('kizlly_guest_username');
+        
         localStorage.setItem('kizlly_token', this.token);
         localStorage.setItem('kizlly_user', JSON.stringify(this.currentUser));
         this.updateNavbar();
