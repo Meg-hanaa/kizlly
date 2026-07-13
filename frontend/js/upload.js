@@ -68,12 +68,16 @@ const UploadView = {
                              <span style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; display:block;">Leave blank to extract automatically from the document, select a date, or set to 3 minutes in the future for testing.</span>
                          </div>
 
-                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 10px;"> Start Ingestion Pipeline</button>
+                        <button type="submit" id="submit-upload-btn" class="btn btn-primary" style="width:100%; margin-top: 10px;"> Start Ingestion Pipeline</button>
                     </form>
                 </div>
-                <!-- Active Pipelines List -->
+                <!-- Active Pipelines & Upload Progress List -->
                 <div class="card p-lg">
-                    <h3 style="margin-top:0;">Active Pipelines</h3>
+                    <h3 style="margin-top:0;">Active Uploads & Pipelines</h3>
+                    
+                    <!-- Live uploads progress wrapper -->
+                    <div id="active-uploads-container" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;"></div>
+                    
                     <div id="pipelines-list" class="pipelines-list">
                         <div class="spinner-container"><div class="spinner"></div></div>
                     </div>
@@ -90,6 +94,12 @@ const UploadView = {
         const uploadForm = document.getElementById('upload-form');
         const dropZone = document.getElementById('drop-zone');
         const filePreview = document.getElementById('file-name-preview');
+        const submitBtn = document.getElementById('submit-upload-btn');
+
+        // Store active XHR uploads to support cancellation & duplicate checks
+        if (!this.activeUploads) {
+            this.activeUploads = {};
+        }
 
         if (dropZone && fileInput) {
             // Standard input overlays the zone, so click trigger is handled natively by the browser.
@@ -161,30 +171,167 @@ const UploadView = {
                     return;
                 }
 
+                // Verify duplicate file uploads
+                const uploadKey = `${file.name}_${file.size}`;
+                if (this.activeUploads[uploadKey]) {
+                    App.showToast('This document is already uploading in progress.', 'warning');
+                    return;
+                }
+
                 const vendorName = document.getElementById('vendor-name').value.trim();
                 const contractTitle = document.getElementById('contract-title').value.trim();
                 const renewalDate = document.getElementById('renewal-date').value;
 
-                try {
-                    App.showToast('Uploading contract and starting workflow...', 'info');
-                    const res = await API.uploadContract(file, vendorName, contractTitle, renewalDate);
-                    App.showToast(res.message, 'success');
-                    
-                    // Reset upload state
-                    uploadForm.reset();
-                    if (filePreview) {
-                        filePreview.style.display = 'none';
-                        filePreview.textContent = '';
+                // Disable submission interaction fields during setup
+                fileInput.disabled = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Uploading file...';
+
+                // Initialise visual progress tracker
+                const progressId = 'prog_' + Math.random().toString(36).substring(2, 9);
+                this.renderUploadProgressTrack(progressId, file.name, file.size);
+
+                const performUpload = async () => {
+                    const xhrRef = {};
+                    this.activeUploads[uploadKey] = {
+                        xhrRef,
+                        file,
+                        vendorName,
+                        contractTitle,
+                        renewalDate,
+                        progressId
+                    };
+
+                    // Add cancellation handler
+                    const cancelBtn = document.getElementById(`cancel-${progressId}`);
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', () => {
+                            if (xhrRef.xhr) {
+                                xhrRef.xhr.abort();
+                            }
+                            delete this.activeUploads[uploadKey];
+                            document.getElementById(`track-${progressId}`)?.remove();
+                            
+                            // Re-enable form fields
+                            fileInput.disabled = false;
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Start Ingestion Pipeline';
+                        });
                     }
-                    
-                    await this.loadActivePipelines();
-                } catch (err) {
-                    App.showToast(err.message, 'error');
-                }
+
+                    try {
+                        const res = await API.uploadContractWithProgress(
+                            file, 
+                            vendorName, 
+                            contractTitle, 
+                            renewalDate,
+                            (pct) => {
+                                const bar = document.getElementById(`bar-${progressId}`);
+                                const label = document.getElementById(`lbl-${progressId}`);
+                                if (bar) bar.style.width = `${pct}%`;
+                                if (label) label.textContent = `${pct}%`;
+                            },
+                            (status) => {
+                                const statText = document.getElementById(`status-${progressId}`);
+                                if (statText) statText.textContent = status;
+                            },
+                            xhrRef
+                        );
+
+                        // Success transition
+                        const statText = document.getElementById(`status-${progressId}`);
+                        if (statText) statText.textContent = 'Processing complete.';
+                        App.showToast(res.message, 'success');
+
+                        setTimeout(() => {
+                            document.getElementById(`track-${progressId}`)?.remove();
+                        }, 2000);
+
+                        // Reset upload state
+                        uploadForm.reset();
+                        if (filePreview) {
+                            filePreview.style.display = 'none';
+                            filePreview.textContent = '';
+                        }
+                        delete this.activeUploads[uploadKey];
+
+                        // Re-enable form fields
+                        fileInput.disabled = false;
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Start Ingestion Pipeline';
+
+                        await this.loadActivePipelines();
+                    } catch (err) {
+                        // Error handling: Show retry options in track card
+                        delete this.activeUploads[uploadKey];
+                        const trackCard = document.getElementById(`track-${progressId}`);
+                        if (trackCard) {
+                            trackCard.style.borderLeft = '4px solid var(--accent-rose)';
+                            const statText = document.getElementById(`status-${progressId}`);
+                            if (statText) statText.textContent = `Failed: ${err.message}`;
+                            
+                            // Replace cancel with retry button
+                            const actionArea = document.getElementById(`actions-${progressId}`);
+                            if (actionArea) {
+                                actionArea.innerHTML = `
+                                    <button class="btn btn-outline btn-sm" id="retry-${progressId}" style="padding: 4px 8px; font-size: 0.75rem; color: var(--accent-teal);">Retry</button>
+                                    <button class="btn btn-outline btn-sm" id="discard-${progressId}" style="padding: 4px 8px; font-size: 0.75rem;">Dismiss</button>
+                                `;
+
+                                document.getElementById(`retry-${progressId}`).addEventListener('click', () => {
+                                    trackCard.style.borderLeft = '4px solid var(--accent-teal)';
+                                    actionArea.innerHTML = `<button class="btn btn-outline btn-sm" id="cancel-${progressId}" style="padding: 4px 8px; font-size: 0.75rem;">Cancel</button>`;
+                                    performUpload();
+                                });
+
+                                document.getElementById(`discard-${progressId}`).addEventListener('click', () => {
+                                    trackCard.remove();
+                                    fileInput.disabled = false;
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'Start Ingestion Pipeline';
+                                });
+                            }
+                        } else {
+                            App.showToast(err.message, 'error');
+                            fileInput.disabled = false;
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Start Ingestion Pipeline';
+                        }
+                    }
+                };
+
+                await performUpload();
             });
         }
     },
 
+    renderUploadProgressTrack(id, name, size) {
+        const container = document.getElementById('active-uploads-container');
+        if (!container) return;
+
+        const sizeKb = (size / 1024).toFixed(1);
+        const html = `
+            <div class="card p-md" id="track-${id}" style="border-left: 4px solid var(--accent-teal); display: flex; flex-direction: column; gap: 8px;">
+                <div class="flex-between">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary);">${name}</strong>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 6px;">(${sizeKb} KB)</span>
+                    </div>
+                    <div id="actions-${id}">
+                        <button class="btn btn-outline btn-sm" id="cancel-${id}" style="padding: 4px 8px; font-size: 0.75rem;">Cancel</button>
+                    </div>
+                </div>
+                <div style="background: var(--bg-tertiary); height: 8px; border-radius: 4px; overflow: hidden; position: relative;">
+                    <div id="bar-${id}" style="background: var(--accent-teal); width: 0%; height: 100%; transition: width 0.1s ease;"></div>
+                </div>
+                <div class="flex-between" style="font-size: 0.75rem;">
+                    <span id="status-${id}" style="color: var(--text-secondary); font-weight: 500;">Preparing upload...</span>
+                    <span id="lbl-${id}" style="font-weight: 600; color: var(--text-primary);">0%</span>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    },
 
     async loadActivePipelines() {
         const listContainer = document.getElementById('pipelines-list');

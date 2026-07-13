@@ -122,6 +122,86 @@ const API = {
         return this.request('POST', '/api/contracts/upload', formData, true);
     },
 
+    uploadContractWithProgress(file, vendorName, contractTitle, renewalDate, onProgress, onStatusChange, xhrRef = {}) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhrRef.xhr = xhr; // Allow parent to cancel the request
+
+            const url = `${this.BASE_URL}/api/contracts/upload`;
+            xhr.open('POST', url, true);
+
+            const token = localStorage.getItem('kizlly_token') || localStorage.getItem('kizlly_guest_token');
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentage = Math.round((event.loaded / event.total) * 100);
+                    onProgress(percentage);
+                    if (percentage < 100) {
+                        onStatusChange(`Uploading... (${percentage}%)`);
+                    } else {
+                        onStatusChange('Upload complete. Processing document...');
+                    }
+                }
+            });
+
+            xhr.upload.addEventListener('loadstart', () => {
+                onProgress(0);
+                onStatusChange('Preparing upload...');
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch (e) {
+                        reject(new Error('Invalid response from server'));
+                    }
+                } else {
+                    let errorMsg = `Request failed (${xhr.status})`;
+                    try {
+                        const errData = JSON.parse(xhr.responseText);
+                        let detail = errData.detail || errData.message || errData.error;
+                        if (detail) {
+                            if (typeof detail === 'object') {
+                                if (Array.isArray(detail)) {
+                                    errorMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                                } else {
+                                    errorMsg = detail.msg || JSON.stringify(detail);
+                                }
+                            } else {
+                                errorMsg = detail;
+                            }
+                        }
+                    } catch (_) {}
+                    reject(new Error(errorMsg));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error — unable to reach the server. Please check your connection.'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload cancelled by user.'));
+            });
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('vendor_name', vendorName);
+            formData.append('contract_title', contractTitle);
+            if (renewalDate) {
+                formData.append('renewal_date', renewalDate);
+            }
+
+            xhr.send(formData);
+        });
+    },
+
     async getContractStatus(contractId) {
         return this.request('GET', `/api/contracts/${contractId}/status`);
     },
