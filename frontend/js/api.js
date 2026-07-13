@@ -10,7 +10,7 @@ const API = {
     async request(method, path, body = null, isFormData = false) {
         const url = `${this.BASE_URL}${path}`;
         const headers = {};
-        const token = localStorage.getItem('kizlly_token');
+        const token = localStorage.getItem('kizlly_token') || localStorage.getItem('kizlly_guest_token');
 
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;

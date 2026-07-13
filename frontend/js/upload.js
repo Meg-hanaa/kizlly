@@ -41,13 +41,13 @@ const UploadView = {
                             <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" required style="display: block; width: 100%; border: 2px solid var(--border-color); padding: 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); cursor: pointer;" />
                         </div>
                         <div class="form-group">
-                            <label for="vendor-name">Counterparty / Vendor Name *</label>
-                            <input type="text" id="vendor-name" placeholder="e.g., Acme Corporation" required />
+                            <label for="vendor-name">Counterparty / Vendor Name (Optional)</label>
+                            <input type="text" id="vendor-name" placeholder="Leave empty for auto-extraction (e.g. Acme Corp)" />
                         </div>
 
                         <div class="form-group">
-                            <label for="contract-title">Contract Title / Reference *</label>
-                            <input type="text" id="contract-title" placeholder="e.g., Master Services Agreement 2026" required />
+                            <label for="contract-title">Contract Title / Reference (Optional)</label>
+                            <input type="text" id="contract-title" placeholder="Leave empty for auto-extraction (e.g. MSA 2026)" />
                         </div>
                         <div class="form-group">
                             <label for="renewal-date">Target Renewal Date</label>

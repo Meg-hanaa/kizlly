@@ -82,6 +82,8 @@ def step_ingest(
     extracted_renewal_date = None
     extracted_notice_deadline = None
     auto_renewal = None
+    extracted_vendor = None
+    extracted_title = None
 
     try:
         from llm.groq_client import GroqClient
@@ -92,11 +94,15 @@ def step_ingest(
             "Analyze the contract text to extract:\n"
             "1. The next renewal or expiration date.\n"
             "2. Whether there is an auto-renewal clause.\n"
-            "3. The notice-period deadline (when notice of non-renewal must be given, e.g. if renewal is 2026-12-31 and notice is 30 days prior, the notice deadline is 2026-12-01).\n\n"
+            "3. The notice-period deadline (when notice of non-renewal must be given, e.g. if renewal is 2026-12-31 and notice is 30 days prior, the notice deadline is 2026-12-01).\n"
+            "4. The contract title or document name (e.g. Master Services Agreement, Lease Contract).\n"
+            "5. The vendor name or the counterparty performing services in this agreement.\n\n"
             "Format dates as YYYY-MM-DD. Return a JSON object with keys:\n"
             '- "renewal_date": "YYYY-MM-DD" or null\n'
             '- "auto_renewal": true/false or null\n'
-            '- "notice_deadline": "YYYY-MM-DD" or null\n\n'
+            '- "notice_deadline": "YYYY-MM-DD" or null\n'
+            '- "contract_title": "String" or null\n'
+            '- "vendor_name": "String" or null\n\n'
             "Return ONLY valid JSON, no markdown fences or extra text."
         )
         response_raw = groq.chat(system_prompt=system_prompt, user_prompt=snippet)
@@ -107,10 +113,12 @@ def step_ingest(
         extracted_renewal_date = extracted_data.get("renewal_date")
         extracted_notice_deadline = extracted_data.get("notice_deadline")
         auto_renewal = extracted_data.get("auto_renewal")
+        extracted_vendor = extracted_data.get("vendor_name")
+        extracted_title = extracted_data.get("contract_title")
 
         logger.info(
-            "[ingest] Extracted dates: renewal_date=%s, notice_deadline=%s, auto_renewal=%s",
-            extracted_renewal_date, extracted_notice_deadline, auto_renewal
+            "[ingest] Extracted details: renewal_date=%s, notice_deadline=%s, auto_renewal=%s, vendor=%s, title=%s",
+            extracted_renewal_date, extracted_notice_deadline, auto_renewal, extracted_vendor, extracted_title
         )
 
         # Log outbound data for privacy transparency
@@ -134,12 +142,14 @@ def step_ingest(
     
     final_renewal_date = renewal_date or extracted_renewal_date
     final_notice_deadline = extracted_notice_deadline
+    final_title = contract_title or extracted_title or filename.rsplit(".", 1)[0]
+    final_vendor = vendor_name or extracted_vendor or "Unknown Vendor"
 
     workflow.contract_meta = ContractMetadata(
         id=workflow.contract_id,
         filename=filename,
-        title=contract_title or filename.rsplit(".", 1)[0],
-        vendor_name=vendor_name or "Unknown Vendor",
+        title=final_title,
+        vendor_name=final_vendor,
         total_chars=len(text),
         total_pages=pdf_res.get("pages", 1) if ext == ".pdf" else 1,
         renewal_date=final_renewal_date,
